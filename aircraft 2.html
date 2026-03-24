@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AERO — Engineering Anatomy · Boeing 737 Max</title>
+<script>
+MathJax = {
+  tex: { inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']], tags: 'ams' },
+  options: { skipHtmlTags: ['script','noscript','style','textarea','pre'] }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,300;0,400;1,300&display=swap');
+
+:root {
+  --bg: #020810;
+  --panel: rgba(4,16,36,0.97);
+  --accent: #00d4ff;
+  --accent2: #ff6b35;
+  --accent3: #39ff14;
+  --accent4: #ffd700;
+  --glow: 0 0 18px rgba(0,212,255,0.45);
+  --glow2: 0 0 18px rgba(255,107,53,0.45);
+  --text: #c8e6f5;
+  --text2: #7fb3d0;
+  --dim: #3a6a88;
+  --border: rgba(0,212,255,0.18);
+  --eq-bg: rgba(0,20,40,0.8);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+html, body {
+  height:100%; width:100%;
+  overflow:hidden;
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Rajdhani', sans-serif;
+  cursor:crosshair;
+}
+
+/* ─── STARFIELD ─── */
+#starfield { position:fixed; inset:0; z-index:0; pointer-events:none; }
+
+/* ─── GRID ─── */
+.grid-bg {
+  position:fixed; inset:0; z-index:1; pointer-events:none;
+  background-image:
+    linear-gradient(rgba(0,212,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg,rgba(0,212,255,0.025) 1px,transparent 1px);
+  background-size:60px 60px;
+}
+
+/* ─── SCAN LINE ─── */
+.scan-line {
+  position:fixed; left:0; right:0; height:1px;
+  background:linear-gradient(to right,transparent,rgba(0,212,255,0.12),transparent);
+  z-index:2; pointer-events:none;
+  animation:scan 10s linear infinite;
+}
+@keyframes scan { 0%{top:-2px} 100%{top:100vh} }
+
+/* ─── HEADER ─── */
+.header {
+  position:fixed; top:0; left:0; right:0; z-index:100;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:10px 24px;
+  background:linear-gradient(to bottom,rgba(2,8,16,0.97),transparent);
+  border-bottom:1px solid var(--border);
+}
+.logo {
+  font-family:'Orbitron',monospace; font-size:1.5rem; font-weight:900;
+  letter-spacing:.35em; color:var(--accent); text-shadow:var(--glow);
+}
+.logo span { color:var(--accent2); }
+.logo-sub { font-family:'Share Tech Mono',monospace; font-size:.55rem; color:var(--dim); letter-spacing:.2em; margin-top:2px; }
+.header-right { display:flex; gap:10px; align-items:center; }
+.mode-btn {
+  font-family:'Orbitron',monospace; font-size:.55rem; letter-spacing:.12em;
+  padding:5px 12px; border:1px solid var(--dim); background:transparent;
+  color:var(--dim); cursor:pointer; transition:all .2s; text-transform:uppercase;
+}
+.mode-btn:hover { border-color:var(--accent); color:var(--accent); }
+.mode-btn.active { background:var(--accent); color:var(--bg); border-color:var(--accent); box-shadow:var(--glow); }
+
+/* ─── PLANE VIEWPORT ─── */
+#plane-wrapper {
+  position:fixed; inset:0; z-index:10;
+  display:flex; align-items:center; justify-content:center;
+  perspective:1400px;
+}
+#plane-3d {
+  transform-style:preserve-3d;
+  position:relative;
+  transition:filter .3s;
+}
+#plane-svg {
+  width:min(80vw,800px); height:auto;
+  filter:drop-shadow(0 0 28px rgba(0,212,255,0.15));
+}
+
+/* ─── HOTSPOTS ─── */
+.hotspot {
+  position:absolute; width:20px; height:20px;
+  transform:translate(-50%,-50%); cursor:pointer; z-index:50;
+}
+.hotspot-ring {
+  position:absolute; inset:0; border-radius:50%;
+  border:1.5px solid var(--accent);
+  animation:pulse-ring 2.2s ease-out infinite;
+}
+.hotspot-dot {
+  position:absolute; inset:5px; border-radius:50%;
+  background:var(--accent); box-shadow:0 0 7px var(--accent);
+  transition:transform .2s;
+}
+.hotspot:hover .hotspot-dot { transform:scale(1.5); }
+.hotspot.c2 .hotspot-ring { border-color:var(--accent2); animation-name:pulse2; }
+.hotspot.c2 .hotspot-dot { background:var(--accent2); box-shadow:0 0 7px var(--accent2); }
+.hotspot.c3 .hotspot-ring { border-color:var(--accent3); animation-name:pulse3; }
+.hotspot.c3 .hotspot-dot { background:var(--accent3); box-shadow:0 0 7px var(--accent3); }
+.hotspot.c4 .hotspot-ring { border-color:var(--accent4); animation-name:pulse4; }
+.hotspot.c4 .hotspot-dot { background:var(--accent4); box-shadow:0 0 7px var(--accent4); }
+@keyframes pulse-ring { 0%{transform:scale(1);opacity:1} 100%{transform:scale(2.8);opacity:0} }
+@keyframes pulse2 { 0%{transform:scale(1);opacity:1} 100%{transform:scale(2.8);opacity:0} }
+@keyframes pulse3 { 0%{transform:scale(1);opacity:1} 100%{transform:scale(2.8);opacity:0} }
+@keyframes pulse4 { 0%{transform:scale(1);opacity:1} 100%{transform:scale(2.8);opacity:0} }
+
+/* ─── PARTS SIDEBAR ─── */
+#parts-sidebar {
+  position:fixed; left:0; top:60px; bottom:0; z-index:200;
+  width:195px; background:var(--panel);
+  border-right:1px solid var(--border);
+  overflow-y:auto; overflow-x:hidden;
+  scrollbar-width:thin; scrollbar-color:var(--dim) transparent;
+}
+.sidebar-head {
+  font-family:'Orbitron',monospace; font-size:.5rem; letter-spacing:.25em;
+  color:var(--dim); padding:12px 16px 8px;
+  border-bottom:1px solid rgba(0,212,255,0.08); text-transform:uppercase;
+}
+.part-item {
+  padding:8px 14px; cursor:pointer;
+  border-bottom:1px solid rgba(0,212,255,0.05);
+  transition:all .18s; display:flex; align-items:center; gap:8px;
+}
+.part-item:hover { background:rgba(0,212,255,0.06); }
+.part-item.active { background:rgba(0,212,255,0.1); border-left:2px solid var(--accent); }
+.pdot { width:5px; height:5px; border-radius:50%; background:var(--accent); flex-shrink:0; }
+.pdot.c2 { background:var(--accent2); }
+.pdot.c3 { background:var(--accent3); }
+.pdot.c4 { background:var(--accent4); }
+.pname { font-size:.78rem; font-weight:600; letter-spacing:.04em; color:var(--text2); }
+.part-item.active .pname { color:var(--text); }
+
+/* ─── INFO PANEL ─── */
+#info-panel {
+  position:fixed; right:0; top:60px; bottom:0; z-index:200;
+  width:440px; background:var(--panel);
+  border-left:1px solid var(--border);
+  display:flex; flex-direction:column;
+  opacity:0; pointer-events:none;
+  transform:translateX(24px);
+  transition:all .35s cubic-bezier(.16,1,.3,1);
+  overflow:hidden;
+}
+#info-panel.visible { opacity:1; pointer-events:all; transform:translateX(0); }
+
+/* Panel header */
+.ph {
+  padding:14px 20px 10px;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0; position:relative;
+}
+.ph-tag {
+  font-family:'Share Tech Mono',monospace; font-size:.52rem;
+  color:var(--dim); letter-spacing:.22em; text-transform:uppercase; margin-bottom:3px;
+}
+.ph-title {
+  font-family:'Orbitron',monospace; font-size:1rem; font-weight:700;
+  color:var(--accent); text-shadow:var(--glow); letter-spacing:.06em;
+}
+.ph-title.c2 { color:var(--accent2); text-shadow:var(--glow2); }
+.ph-title.c3 { color:var(--accent3); }
+.ph-title.c4 { color:var(--accent4); }
+.close-btn {
+  position:absolute; top:12px; right:14px;
+  background:none; border:1px solid var(--dim); color:var(--dim);
+  width:20px; height:20px; cursor:pointer; font-size:.7rem;
+  display:flex; align-items:center; justify-content:center; transition:all .2s;
+}
+.close-btn:hover { border-color:var(--accent); color:var(--accent); }
+
+/* Tab bar */
+.tab-bar {
+  display:flex; border-bottom:1px solid var(--border); flex-shrink:0;
+  background:rgba(0,8,20,0.5);
+}
+.tab-btn {
+  flex:1; padding:7px 4px; background:none; border:none;
+  font-family:'Orbitron',monospace; font-size:.48rem; letter-spacing:.1em;
+  color:var(--dim); cursor:pointer; transition:all .2s;
+  border-bottom:2px solid transparent; text-transform:uppercase;
+}
+.tab-btn:hover { color:var(--text2); }
+.tab-btn.active { color:var(--accent); border-bottom-color:var(--accent); }
+
+/* Panel body */
+.panel-body {
+  flex:1; overflow-y:auto; overflow-x:hidden;
+  padding:0;
+  scrollbar-width:thin; scrollbar-color:var(--dim) transparent;
+}
+.panel-body::-webkit-scrollbar { width:3px; }
+.panel-body::-webkit-scrollbar-thumb { background:var(--dim); }
+
+/* Tab content */
+.tab-content { display:none; padding:16px 20px 24px; }
+.tab-content.active { display:block; }
+
+/* Content styles */
+.section-label {
+  font-family:'Orbitron',monospace; font-size:.52rem; letter-spacing:.2em;
+  color:var(--accent); text-transform:uppercase; margin:18px 0 6px;
+  display:flex; align-items:center; gap:6px;
+}
+.section-label::after { content:''; flex:1; height:1px; background:var(--border); }
+.section-label:first-child { margin-top:0; }
+
+p.eng {
+  font-size:.88rem; line-height:1.7; color:var(--text2);
+  margin-bottom:10px; font-weight:300;
+}
+p.eng strong { color:var(--text); font-weight:600; }
+
+/* EQUATION BOX */
+.eq-box {
+  background:var(--eq-bg);
+  border:1px solid rgba(0,212,255,0.2);
+  border-left:3px solid var(--accent);
+  padding:12px 16px; margin:10px 0;
+  position:relative; overflow:hidden;
+}
+.eq-box::before {
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(135deg,rgba(0,212,255,0.03),transparent);
+  pointer-events:none;
+}
+.eq-label {
+  font-family:'Share Tech Mono',monospace; font-size:.5rem;
+  color:var(--dim); letter-spacing:.2em; margin-bottom:6px; display:block;
+}
+.eq-box .MathJax { color:var(--accent) !important; }
+
+/* DERIVATION STEP */
+.deriv-step {
+  display:flex; gap:12px; margin:8px 0;
+  padding:8px 12px; background:rgba(0,212,255,0.03);
+  border-left:1px solid rgba(0,212,255,0.12);
+}
+.step-num {
+  font-family:'Orbitron',monospace; font-size:.55rem; color:var(--accent2);
+  flex-shrink:0; padding-top:2px; min-width:18px;
+}
+.step-body { font-size:.82rem; color:var(--text2); line-height:1.65; }
+.step-body .MathJax { font-size:.95em; }
+
+/* STATS GRID */
+.stats-grid {
+  display:grid; grid-template-columns:1fr 1fr; gap:6px; margin:10px 0;
+}
+.stat-card {
+  background:rgba(0,212,255,0.04); border:1px solid rgba(0,212,255,0.1);
+  padding:8px 10px;
+}
+.stat-l { font-family:'Share Tech Mono',monospace; font-size:.48rem; color:var(--dim); letter-spacing:.18em; }
+.stat-v { font-family:'Orbitron',monospace; font-size:.78rem; color:var(--accent); font-weight:700; margin-top:2px; }
+.stat-v.c2 { color:var(--accent2); }
+.stat-v.c3 { color:var(--accent3); }
+
+/* CALLOUT */
+.callout {
+  background:rgba(255,107,53,0.06); border-left:2px solid var(--accent2);
+  padding:10px 13px; margin:10px 0;
+}
+.callout-lbl { font-family:'Share Tech Mono',monospace; font-size:.5rem; color:var(--accent2); letter-spacing:.2em; margin-bottom:4px; }
+.callout-txt { font-size:.82rem; color:var(--text2); line-height:1.6; }
+
+/* NOTE */
+.note {
+  background:rgba(57,255,20,0.04); border-left:2px solid var(--accent3);
+  padding:9px 12px; margin:10px 0;
+}
+.note-lbl { font-family:'Share Tech Mono',monospace; font-size:.5rem; color:var(--accent3); letter-spacing:.2em; margin-bottom:3px; }
+.note-txt { font-size:.8rem; color:var(--text2); line-height:1.6; }
+
+/* INTERACTIVE CALCULATOR */
+.calc-box {
+  background:rgba(0,8,20,0.7); border:1px solid rgba(0,212,255,0.15);
+  padding:14px 16px; margin:12px 0;
+}
+.calc-title {
+  font-family:'Orbitron',monospace; font-size:.55rem; color:var(--accent4);
+  letter-spacing:.15em; margin-bottom:10px; text-transform:uppercase;
+}
+.calc-row { display:flex; align-items:center; gap:8px; margin:6px 0; }
+.calc-row label { font-family:'Share Tech Mono',monospace; font-size:.6rem; color:var(--dim); min-width:120px; }
+.calc-row input {
+  flex:1; background:rgba(0,212,255,0.06); border:1px solid rgba(0,212,255,0.2);
+  color:var(--accent); font-family:'Share Tech Mono',monospace; font-size:.7rem;
+  padding:4px 8px; outline:none;
+}
+.calc-row input:focus { border-color:var(--accent); }
+.calc-row span { font-family:'Share Tech Mono',monospace; font-size:.6rem; color:var(--dim); min-width:30px; }
+.calc-result {
+  margin-top:10px; padding:8px 12px;
+  background:rgba(0,212,255,0.08); border:1px solid rgba(0,212,255,0.2);
+  font-family:'Orbitron',monospace; font-size:.85rem; color:var(--accent);
+  text-align:center; min-height:32px;
+}
+.calc-btn {
+  width:100%; margin-top:8px; padding:7px; background:rgba(0,212,255,0.1);
+  border:1px solid rgba(0,212,255,0.3); color:var(--accent);
+  font-family:'Orbitron',monospace; font-size:.55rem; letter-spacing:.15em;
+  cursor:pointer; transition:all .2s; text-transform:uppercase;
+}
+.calc-btn:hover { background:rgba(0,212,255,0.2); box-shadow:var(--glow); }
+
+/* DIAGRAM */
+.diag-wrap { margin:12px 0; text-align:center; }
+.diag-wrap svg { max-width:100%; }
+.diag-cap { font-family:'Share Tech Mono',monospace; font-size:.5rem; color:var(--dim); letter-spacing:.15em; margin-top:4px; }
+
+/* HUD */
+.hud-corner { position:fixed; font-family:'Share Tech Mono',monospace; font-size:.52rem; color:rgba(0,212,255,0.28); letter-spacing:.1em; z-index:5; line-height:1.9; }
+.hud-bl { bottom:16px; left:210px; }
+.hud-br { bottom:16px; right:450px; text-align:right; }
+
+/* TOOLTIP */
+#tooltip { position:fixed; z-index:500; background:rgba(2,8,16,0.92); border:1px solid var(--accent); padding:4px 10px; font-family:'Share Tech Mono',monospace; font-size:.6rem; color:var(--accent); pointer-events:none; opacity:0; transition:opacity .15s; white-space:nowrap; }
+
+/* BOTTOM BAR */
+#bot-bar { position:fixed; bottom:0; left:0; right:0; height:3px; background:rgba(0,212,255,0.06); z-index:100; }
+#bot-fill { height:100%; background:linear-gradient(to right,var(--accent),var(--accent2)); width:0; transition:width .5s; }
+
+/* DRAG HINT */
+#drag-hint { position:fixed; bottom:28px; left:50%; transform:translateX(-50%); z-index:300; font-family:'Share Tech Mono',monospace; font-size:.58rem; color:rgba(0,212,255,0.38); letter-spacing:.2em; text-transform:uppercase; animation:blink 3s ease-in-out infinite; transition:opacity .5s; pointer-events:none; }
+@keyframes blink { 0%,100%{opacity:.38} 50%{opacity:.85} }
+
+/* SPEED RING */
+#speed-ring { position:fixed; left:210px; bottom:12px; z-index:100; width:60px; height:60px; }
+
+/* RESPONSIVE */
+@media(max-width:900px){
+  #info-panel{ width:100%; top:auto; bottom:0; height:55vh; transform:translateY(24px); border-left:none; border-top:1px solid var(--border); }
+  #info-panel.visible{ transform:translateY(0); }
+  #parts-sidebar{ display:none; }
+  .hud-bl,.hud-br{ display:none; }
+  #speed-ring{ display:none; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="starfield"></canvas>
+<div class="grid-bg"></div>
+<div class="scan-line"></div>
+<div id="bot-bar"><div id="bot-fill"></div></div>
+
+<!-- HEADER -->
+<header class="header">
+  <div>
+    <div class="logo">AER<span>O</span></div>
+    <div class="logo-sub">Engineering Reference · Boeing 737 Max · For Engineers</div>
+  </div>
+  <div class="header-right">
+    <button class="mode-btn active" id="btn-explore" onclick="setMode('explore')">Explore</button>
+    <button class="mode-btn" id="btn-derive" onclick="setMode('derive')">Derivations</button>
+    <button class="mode-btn" id="btn-calc" onclick="setMode('calc')">Calculators</button>
+  </div>
+</header>
+
+<!-- SIDEBAR -->
+<nav id="parts-sidebar">
+  <div class="sidebar-head">⬡ Systems Index</div>
+</nav>
+
+<!-- PLANE -->
+<div id="plane-wrapper">
+  <div id="plane-3d">
+    <svg id="plane-svg" viewBox="0 0 900 420" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="fg" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:#1a3a5c"/><stop offset="50%" style="stop-color:#0d2540"/><stop offset="100%" style="stop-color:#081828"/></linearGradient>
+        <linearGradient id="wg" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:#162d4a"/><stop offset="100%" style="stop-color:#0a1f35"/></linearGradient>
+        <linearGradient id="eg" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:#1e3a5f"/><stop offset="100%" style="stop-color:#0d2540"/></linearGradient>
+        <linearGradient id="ng" x1="100%" y1="0%" x2="0%" y2="0%"><stop offset="0%" style="stop-color:#2a4a70"/><stop offset="100%" style="stop-color:#1a3a5c"/></linearGradient>
+        <filter id="gf"><feGaussianBlur stdDeviation="3" result="cb"/><feMerge><feMergeNode in="cb"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <filter id="sg"><feGaussianBlur stdDeviation="1.5" result="cb"/><feMerge><feMergeNode in="cb"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <radialGradient id="wnd"><stop offset="0%" style="stop-color:#00d4ff;stop-opacity:.55"/><stop offset="100%" style="stop-color:#004466;stop-opacity:.25"/></radialGradient>
+        <linearGradient id="cpg" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#00d4ff;stop-opacity:.45"/><stop offset="100%" style="stop-color:#004466;stop-opacity:.2"/></linearGradient>
+      </defs>
+      <!-- Fuselage -->
+      <ellipse cx="450" cy="210" rx="310" ry="52" fill="url(#fg)"/>
+      <ellipse cx="450" cy="193" rx="290" ry="17" fill="rgba(0,212,255,0.055)"/>
+      <ellipse cx="460" cy="240" rx="280" ry="21" fill="rgba(0,0,0,0.28)"/>
+      <path d="M150,210 Q450,196 750,210" stroke="#00d4ff" stroke-width="1.2" fill="none" opacity=".35"/>
+      <!-- Nose -->
+      <path id="nose-shape" d="M140,210 Q80,210 30,208 Q15,208 10,210 Q15,212 30,212 Q80,215 140,215 Z" fill="url(#ng)"/>
+      <ellipse cx="18" cy="210" rx="9" ry="3" fill="#2a4a70"/>
+      <path d="M50,207 Q70,205 100,207" stroke="rgba(255,255,255,0.12)" stroke-width="1.5" fill="none"/>
+      <!-- Cockpit -->
+      <path id="cockpit-shape" d="M140,200 Q170,188 210,192 Q220,192 220,200 Q220,210 210,212 Q170,215 140,212 Z" fill="url(#cpg)" filter="url(#sg)"/>
+      <line x1="185" y1="190" x2="185" y2="213" stroke="rgba(0,212,255,0.28)" stroke-width=".8"/>
+      <!-- Windows -->
+      <g filter="url(#sg)">
+        <rect x="248" y="196" width="18" height="12" rx="4" fill="url(#wnd)"/>
+        <rect x="280" y="196" width="18" height="12" rx="4" fill="url(#wnd)"/>
+        <rect x="312" y="196" width="18" height="12" rx="4" fill="url(#wnd)"/>
+        <rect x="344" y="196" width="18" height="12" rx="4" fill="url(#wnd)"/>
+        <rect x="376" y="196" width="18" height="12" rx="4" fill="url(#wnd)"/>
+        <rect x="408" y="196" width="18" height="12" rx="4" fill="url(#wnd)"/>
+        <rect x="440" y="196" width="18" height="12" rx="4" fill="url(#wnd)"/>
+        <rect x="472" y="196" width="18" height="12" rx="4" fill="url(#wnd)"/>
+        <rect x="504" y="196" width="18" height="12" rx="4" fill="url(#wnd)"/>
+        <rect x="536" y="196" width="18" height="12" rx="4" fill="url(#wnd)"/>
+        <rect x="568" y="196" width="18" height="12" rx="4" fill="url(#wnd)"/>
+        <rect x="600" y="196" width="18" height="12" rx="4" fill="url(#wnd)"/>
+        <rect x="632" y="196" width="18" height="12" rx="4" fill="url(#wnd)"/>
+        <rect x="664" y="196" width="18" height="12" rx="4" fill="url(#wnd)"/>
+        <rect x="696" y="196" width="18" height="12" rx="4" fill="url(#wnd)"/>
+        <rect x="724" y="199" width="14" height="10" rx="3" fill="url(#wnd)" opacity=".55"/>
+      </g>
+      <!-- Far wings -->
+      <path d="M390,230 Q340,300 230,380 Q220,390 230,385 Q360,330 420,255 Z" fill="rgba(15,35,60,0.65)" stroke="rgba(0,212,255,0.12)" stroke-width=".8"/>
+      <path d="M490,215 Q570,155 700,90 Q715,83 705,88 Q580,160 510,220 Z" fill="rgba(15,35,60,0.65)" stroke="rgba(0,212,255,0.12)" stroke-width=".8"/>
+      <!-- Near wings -->
+      <path id="wing-lower" d="M380,230 Q330,310 200,390 Q185,400 200,395 Q350,340 410,258 Z" fill="url(#wg)" stroke="rgba(0,212,255,0.22)" stroke-width="1"/>
+      <path id="wing-upper" d="M495,215 Q580,150 715,82 Q730,74 720,80 Q595,155 520,220 Z" fill="url(#wg)" stroke="rgba(0,212,255,0.22)" stroke-width="1"/>
+      <!-- Winglets -->
+      <path id="winglet-lo" d="M198,392 Q182,404 180,414 Q190,406 205,396 Z" fill="#1a3a5c" stroke="rgba(0,212,255,0.28)" stroke-width="1"/>
+      <path id="winglet-up" d="M718,79 Q730,68 735,60 Q724,70 712,82 Z" fill="#1a3a5c" stroke="rgba(0,212,255,0.28)" stroke-width="1"/>
+      <!-- Engine lower -->
+      <g id="engine-lo">
+        <ellipse cx="306" cy="316" rx="36" ry="20" fill="#0a1e35" stroke="rgba(0,212,255,0.28)" stroke-width="1"/>
+        <rect x="274" y="298" width="58" height="36" rx="8" fill="url(#eg)" stroke="rgba(0,212,255,0.18)" stroke-width="1"/>
+        <ellipse cx="332" cy="316" rx="14" ry="19" fill="#081828" stroke="rgba(0,212,255,0.38)" stroke-width="1.2"/>
+        <ellipse cx="332" cy="316" rx="10" ry="15" fill="none" stroke="rgba(0,212,255,0.12)" stroke-width=".8"/>
+        <line x1="332" y1="301" x2="332" y2="331" stroke="rgba(0,212,255,0.18)" stroke-width=".6"/>
+        <line x1="321" y1="306" x2="343" y2="326" stroke="rgba(0,212,255,0.18)" stroke-width=".6"/>
+        <line x1="321" y1="326" x2="343" y2="306" stroke="rgba(0,212,255,0.18)" stroke-width=".6"/>
+        <ellipse cx="332" cy="316" rx="5" ry="7" fill="rgba(0,212,255,0.07)"/>
+        <path d="M274,302 Q260,310 258,316 Q260,322 274,330" fill="rgba(255,107,53,0.14)" stroke="rgba(255,107,53,0.28)" stroke-width=".8"/>
+        <path d="M295,298 Q300,272 310,258" stroke="rgba(0,212,255,0.18)" stroke-width="2" fill="none"/>
+        <ellipse cx="255" cy="316" rx="6" ry="15" fill="none" stroke="rgba(255,107,53,0.28)" stroke-width="1.2"><animate attributeName="rx" values="6;10;6" dur=".9s" repeatCount="indefinite"/><animate attributeName="opacity" values=".5;.1;.5" dur=".9s" repeatCount="indefinite"/></ellipse>
+      </g>
+      <!-- Engine upper -->
+      <g id="engine-up">
+        <ellipse cx="598" cy="110" rx="28" ry="15" fill="#081828" stroke="rgba(0,212,255,0.18)" stroke-width=".8"/>
+        <rect x="574" y="98" width="46" height="28" rx="6" fill="url(#eg)" stroke="rgba(0,212,255,0.14)" stroke-width=".8" opacity=".85"/>
+        <ellipse cx="620" cy="112" rx="11" ry="15" fill="#081828" stroke="rgba(0,212,255,0.28)" stroke-width="1"/>
+        <path d="M574,102 Q562,108 560,112 Q562,116 574,122" fill="rgba(255,107,53,0.1)" stroke="rgba(255,107,53,0.18)" stroke-width=".6"/>
+        <path d="M590,98 Q596,80 604,70" stroke="rgba(0,212,255,0.14)" stroke-width="1.5" fill="none"/>
+      </g>
+      <!-- Tail fin -->
+      <path d="M745,208 Q763,128 800,88 Q806,82 803,87 Q775,140 760,210 Z" fill="rgba(15,35,60,0.6)" stroke="rgba(0,212,255,0.1)" stroke-width=".8"/>
+      <path id="tail-fin" d="M740,205 Q760,120 800,80 Q820,65 825,70 Q810,90 785,150 Q775,180 760,210 Z" fill="url(#wg)" stroke="rgba(0,212,255,0.22)" stroke-width="1"/>
+      <path d="M785,95 Q772,145 762,205" stroke="rgba(0,212,255,0.18)" stroke-width=".8" fill="none" stroke-dasharray="4,3"/>
+      <!-- H-stabs -->
+      <path id="hstab-up" d="M740,195 Q790,175 840,165 Q855,162 848,167 Q800,180 748,202 Z" fill="rgba(15,35,60,0.65)" stroke="rgba(0,212,255,0.12)" stroke-width=".8"/>
+      <path id="hstab-lo" d="M740,225 Q790,245 840,255 Q855,258 848,253 Q800,240 748,218 Z" fill="url(#wg)" stroke="rgba(0,212,255,0.22)" stroke-width="1"/>
+      <!-- APU -->
+      <circle cx="758" cy="210" r="4" fill="#081828" stroke="rgba(0,212,255,0.38)" stroke-width="1"/>
+      <!-- Landing gear -->
+      <g opacity=".65">
+        <line x1="115" y1="262" x2="115" y2="290" stroke="#1a3a5c" stroke-width="3"/>
+        <ellipse cx="115" cy="293" rx="8" ry="5" fill="#0d2540" stroke="rgba(0,212,255,0.28)" stroke-width="1"/>
+        <line x1="420" y1="262" x2="415" y2="300" stroke="#1a3a5c" stroke-width="3"/>
+        <line x1="430" y1="262" x2="435" y2="300" stroke="#1a3a5c" stroke-width="3"/>
+        <ellipse cx="415" cy="305" rx="9" ry="5" fill="#0d2540" stroke="rgba(0,212,255,0.28)" stroke-width="1"/>
+        <ellipse cx="435" cy="305" rx="9" ry="5" fill="#0d2540" stroke="rgba(0,212,255,0.28)" stroke-width="1"/>
+        <line x1="470" y1="262" x2="465" y2="300" stroke="#1a3a5c" stroke-width="3"/>
+        <line x1="480" y1="262" x2="485" y2="300" stroke="#1a3a5c" stroke-width="3"/>
+        <ellipse cx="465" cy="305" rx="9" ry="5" fill="#0d2540" stroke="rgba(0,212,255,0.28)" stroke-width="1"/>
+        <ellipse cx="485" cy="305" rx="9" ry="5" fill="#0d2540" stroke="rgba(0,212,255,0.28)" stroke-width="1"/>
+      </g>
+      <!-- Nav lights -->
+      <circle cx="200" cy="393" r="3" fill="#ff3333" opacity=".75" filter="url(#sg)"><animate attributeName="opacity" values=".75;.15;.75" dur="1.5s" repeatCount="indefinite"/></circle>
+      <circle cx="720" cy="80" r="3" fill="#33ff33" opacity=".75" filter="url(#sg)"><animate attributeName="opacity" values=".75;.15;.75" dur="1.5s" begin=".75s" repeatCount="indefinite"/></circle>
+      <circle cx="450" cy="158" r="3" fill="#ff6600" opacity=".65"><animate attributeName="opacity" values=".65;.1;.65" dur="1s" repeatCount="indefinite"/></circle>
+      <!-- Fuselage glow outline -->
+      <ellipse cx="450" cy="210" rx="310" ry="52" fill="none" stroke="rgba(0,212,255,0.06)" stroke-width="2" filter="url(#gf)"/>
+    </svg>
+    <!-- HOTSPOTS -->
+    <div class="hotspot" id="hs-nose"     style="left:3.5%;top:49%"  data-part="nose"     title="Nose Cone / Radome"><div class="hotspot-ring"></div><div class="hotspot-dot"></div></div>
+    <div class="hotspot c2" id="hs-cockpit"  style="left:18%;top:46%"   data-part="cockpit"  title="Flight Deck"><div class="hotspot-ring"></div><div class="hotspot-dot"></div></div>
+    <div class="hotspot"    id="hs-fuselage" style="left:50%;top:35%"   data-part="fuselage" title="Fuselage"><div class="hotspot-ring"></div><div class="hotspot-dot"></div></div>
+    <div class="hotspot c3" id="hs-windows"  style="left:55%;top:44%"   data-part="windows"  title="Windows"><div class="hotspot-ring"></div><div class="hotspot-dot"></div></div>
+    <div class="hotspot c2" id="hs-wing"     style="left:52%;top:66%"   data-part="wing"     title="Main Wings"><div class="hotspot-ring"></div><div class="hotspot-dot"></div></div>
+    <div class="hotspot"    id="hs-winglet"  style="left:21%;top:92%"   data-part="winglet"  title="Winglet"><div class="hotspot-ring"></div><div class="hotspot-dot"></div></div>
+    <div class="hotspot c2" id="hs-engine"   style="left:34%;top:78%"   data-part="engine"   title="Turbofan Engine"><div class="hotspot-ring"></div><div class="hotspot-dot"></div></div>
+    <div class="hotspot c3" id="hs-aileron"  style="left:27%;top:83%"   data-part="aileron"  title="Ailerons & Flaps"><div class="hotspot-ring"></div><div class="hotspot-dot"></div></div>
+    <div class="hotspot c3" id="hs-tail"     style="left:84%;top:40%"   data-part="tail"     title="Vertical Stabilizer"><div class="hotspot-ring"></div><div class="hotspot-dot"></div></div>
+    <div class="hotspot"    id="hs-hstab"    style="left:88%;top:58%"   data-part="hstab"    title="Horizontal Stabilizer"><div class="hotspot-ring"></div><div class="hotspot-dot"></div></div>
+    <div class="hotspot c3" id="hs-gear"     style="left:47%;top:78%"   data-part="gear"     title="Landing Gear"><div class="hotspot-ring"></div><div class="hotspot-dot"></div></div>
+    <div class="hotspot c4" id="hs-apu"      style="left:82%;top:49%"   data-part="apu"      title="APU"><div class="hotspot-ring"></div><div class="hotspot-dot"></div></div>
+  </div>
+</div>
+
+<!-- HUD -->
+<div class="hud-corner hud-bl">SYS · NOMINAL<br>ENG · 2/2<br>FUEL · 68.4%<br>CABIN · 11.2 PSI<br>— DRAG TO ROTATE —</div>
+<div class="hud-corner hud-br">HDG · 247°<br>SPD · 485 KTS<br>ALT · FL350<br>OAT · −56°C</div>
+<div id="drag-hint">⟳ DRAG TO ROTATE · CLICK HOTSPOTS TO EXPLORE</div>
+<div id="tooltip"></div>
+<div id="speed-ring"></div>
+
+<!-- INFO PANEL -->
+<div id="info-panel">
+  <div class="ph">
+    <div class="ph-tag" id="ph-tag">SELECT A COMPONENT</div>
+    <div class="ph-title" id="ph-title">—</div>
+    <button class="close-btn" onclick="closePanel()">✕</button>
+  </div>
+  <div class="tab-bar" id="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('overview')">Overview</button>
+    <button class="tab-btn" onclick="switchTab('physics')">Physics</button>
+    <button class="tab-btn" onclick="switchTab('math')">Equations</button>
+    <button class="tab-btn" onclick="switchTab('calc')">Calculator</button>
+  </div>
+  <div class="panel-body" id="panel-body">
+    <div class="tab-content active" id="tab-overview"></div>
+    <div class="tab-content" id="tab-physics"></div>
+    <div class="tab-content" id="tab-math"></div>
+    <div class="tab-content" id="tab-calc"></div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════
+   STARFIELD
+═══════════════════════════════════════════════════ */
+const cvs = document.getElementById('starfield');
+const ctx2 = cvs.getContext('2d');
+cvs.width = window.innerWidth; cvs.height = window.innerHeight;
+const stars = Array.from({length:180},()=>({x:Math.random()*cvs.width,y:Math.random()*cvs.height,r:Math.random()*1.1,o:Math.random()}));
+(function drawStars(){
+  ctx2.clearRect(0,0,cvs.width,cvs.height);
+  stars.forEach(s=>{s.o+=(Math.random()-.5)*.008;s.o=Math.max(.04,Math.min(.75,s.o));ctx2.beginPath();ctx2.arc(s.x,s.y,s.r,0,Math.PI*2);ctx2.fillStyle=`rgba(0,212,255,${s.o})`;ctx2.fill();});
+  requestAnimationFrame(drawStars);
+})();
+
+/* ═══════════════════════════════════════════════════
+   3D ROTATION
+═══════════════════════════════════════════════════ */
+let rotX=0,rotY=0,isDrag=false,lx,ly,tx=0,ty=0;
+const p3d=document.getElementById('plane-3d');
+document.addEventListener('mousedown',e=>{if(e.target.closest('#info-panel')||e.target.closest('#parts-sidebar')||e.target.closest('.header')||e.target.closest('.hotspot'))return;isDrag=true;lx=e.clientX;ly=e.clientY;document.getElementById('drag-hint').style.opacity='0';});
+document.addEventListener('mousemove',e=>{if(!isDrag)return;tx+=(e.clientX-lx)*.22;ty+=(e.clientY-ly)*.13;tx=Math.max(-38,Math.min(38,tx));ty=Math.max(-18,Math.min(18,ty));lx=e.clientX;ly=e.clientY;const tip=document.getElementById('tooltip');tip.style.left=e.clientX+14+'px';tip.style.top=e.clientY-8+'px';});
+document.addEventListener('mouseup',()=>{isDrag=false;});
+document.addEventListener('touchstart',e=>{if(e.target.closest('#info-panel')||e.target.closest('#parts-sidebar'))return;isDrag=true;lx=e.touches[0].clientX;ly=e.touches[0].clientY;},{passive:true});
+document.addEventListener('touchmove',e=>{if(!isDrag)return;tx+=(e.touches[0].clientX-lx)*.22;ty+=(e.touches[0].clientY-ly)*.13;tx=Math.max(-38,Math.min(38,tx));ty=Math.max(-18,Math.min(18,ty));lx=e.touches[0].clientX;ly=e.touches[0].clientY;},{passive:true});
+document.addEventListener('touchend',()=>{isDrag=false;});
+(function anim(){rotX+=(ty-rotX)*.07;rotY+=(tx-rotY)*.07;p3d.style.transform=`rotateX(${rotX}deg) rotateY(${rotY}deg)`;requestAnimationFrame(anim);})();
+let idleT; document.addEventListener('mousemove',()=>{clearTimeout(idleT);idleT=setTimeout(()=>{tx=0;ty=0;},9000);});
+
+/* ═══════════════════════════════════════════════════
+   PART DATA
+═══════════════════════════════════════════════════ */
+const PARTS = {
+  nose:{
+    label:'AIRFRAME · FORWARD SECTION', title:'Nose Cone & Radome', color:'c1',
+    tabs:{
+      overview:`
+        <div class="section-label">Description</div>
+        <p class="eng">The <strong>nose cone</strong> serves dual purposes: it gives the aircraft its aerodynamically optimised forward geometry and houses the weather radar antenna (radome). Built from fibreglass-reinforced composite, it is electromagnetically transparent to X-band radar frequencies (~9.4 GHz).</p>
+        <p class="eng">The cone's ogive profile (a solid of revolution formed by rotating a circular arc) minimises wave drag at high subsonic speeds. At Mach 0.78, even small geometric deviations produce measurable drag penalties.</p>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-l">MATERIAL</div><div class="stat-v">Fibreglass/Kevlar</div></div>
+          <div class="stat-card"><div class="stat-l">RADAR TYPE</div><div class="stat-v">X-band, ~9.4 GHz</div></div>
+          <div class="stat-card"><div class="stat-l">RADAR RANGE</div><div class="stat-v">320 km</div></div>
+          <div class="stat-card"><div class="stat-l">HALF-ANGLE</div><div class="stat-v">~8–12°</div></div>
+        </div>
+        <div class="callout"><div class="callout-lbl">Engineering Note</div><div class="callout-txt">The nose is intentionally frangible — designed to shatter on bird strike rather than deform, which would misalign the radar. Replacement takes under 2 hours on the ramp.</div></div>`,
+      physics:`
+        <div class="section-label">Wave Drag & Ogive Geometry</div>
+        <p class="eng">At subsonic speeds, the primary drag mechanism at the nose is <strong>pressure drag</strong> from flow stagnation. The ogive profile delays flow separation by maintaining attached boundary layer flow further aft. The stagnation pressure at the nose tip equals:</p>
+        <div class="eq-box"><span class="eq-label">STAGNATION PRESSURE</span>$$p_0 = p_\\infty\\left(1 + \\frac{\\gamma-1}{2}M^2\\right)^{\\frac{\\gamma}{\\gamma-1}}$$</div>
+        <p class="eng">where $p_\\infty$ is freestream static pressure, $\\gamma = 1.4$ (ratio of specific heats for air), and $M$ is the Mach number. At FL350, $M = 0.78$:</p>
+        <div class="deriv-step"><div class="step-num">1.</div><div class="step-body">Freestream static pressure at FL350: $p_\\infty \\approx 23{,}842$ Pa</div></div>
+        <div class="deriv-step"><div class="step-num">2.</div><div class="step-body">$p_0 = 23842\\left(1 + \\frac{0.4}{2}(0.78)^2\\right)^{3.5} = 23842 \\times (1.1217)^{3.5} \\approx 37{,}600$ Pa</div></div>
+        <div class="deriv-step"><div class="step-num">3.</div><div class="step-body">Dynamic pressure: $q = p_0 - p_\\infty \\approx 13{,}758$ Pa</div></div>
+        <div class="note"><div class="note-lbl">Ogive Radius Formula</div><div class="note-txt">For a tangent ogive of body radius $R$ and length $L$: the profile radius at station $x$ is $\\rho = \\sqrt{\\rho_{og}^2 - (L-x)^2} + R - \\rho_{og}$, where $\\rho_{og} = (R^2+L^2)/(2R)$.</div></div>`,
+      math:`
+        <div class="section-label">Governing Equations</div>
+        <div class="eq-box"><span class="eq-label">ISENTROPIC FLOW — TEMP RATIO</span>$$\\frac{T_0}{T_\\infty} = 1 + \\frac{\\gamma-1}{2}M^2$$</div>
+        <div class="eq-box"><span class="eq-label">ISENTROPIC FLOW — DENSITY RATIO</span>$$\\frac{\\rho_0}{\\rho_\\infty} = \\left(1 + \\frac{\\gamma-1}{2}M^2\\right)^{\\frac{1}{\\gamma-1}}$$</div>
+        <div class="eq-box"><span class="eq-label">PRESSURE COEFFICIENT AT STAGNATION</span>$$C_{p,stag} = \\frac{p_0 - p_\\infty}{q_\\infty} = \\frac{2}{\\gamma M^2}\\left[\\left(1+\\frac{\\gamma-1}{2}M^2\\right)^{\\frac{\\gamma}{\\gamma-1}} - 1\\right]$$</div>
+        <div class="eq-box"><span class="eq-label">SPEED OF SOUND</span>$$a = \\sqrt{\\gamma R T} \\quad \\Rightarrow \\quad a_{FL350} = \\sqrt{1.4 \\times 287 \\times 217} = 295.4 \\text{ m/s}$$</div>
+        <p class="eng">At $M = 0.78$: True Airspeed $= 0.78 \\times 295.4 = 230.4$ m/s $\\approx 448$ kt. At the stagnation point, all kinetic energy converts to enthalpy — raising local temperature by $\\Delta T = T_\\infty \\frac{\\gamma-1}{2}M^2 \\approx 26.8$ K.</p>`,
+      calc:`
+        <div class="calc-title">⚙ Stagnation Pressure Calculator</div>
+        <div class="calc-box">
+          <div class="calc-row"><label>Mach Number (M)</label><input id="c-mach" type="number" value="0.78" step="0.01" min="0.1" max="0.95"><span>—</span></div>
+          <div class="calc-row"><label>Altitude (ft)</label><input id="c-alt" type="number" value="35000" step="1000"><span>ft</span></div>
+          <button class="calc-btn" onclick="calcNose()">COMPUTE</button>
+          <div class="calc-result" id="nose-result">Press COMPUTE to calculate</div>
+        </div>`
+    }
+  },
+
+  cockpit:{
+    label:'FLIGHT DECK · AVIONICS', title:'Cockpit / Flight Deck', color:'c2',
+    tabs:{
+      overview:`
+        <div class="section-label">Architecture</div>
+        <p class="eng">The <strong>Flight Deck</strong> of the 737 Max is a glass cockpit featuring six 15.1-inch LCD displays arranged in two primary and two multi-function display (MFD) columns. Honeywell's Flight Management System (FMS) runs dual-redundant computers that compute lateral and vertical navigation profiles, optimal step-climbs, and fuel predictions.</p>
+        <p class="eng">The <strong>Primary Flight Display (PFD)</strong> integrates: attitude (pitch/roll), airspeed, altitude, vertical speed, heading, flight mode annunciations, and approach deviation. The <strong>Navigation Display (ND)</strong> shows map, weather radar, TCAS, and wind vectors.</p>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-l">DISPLAYS</div><div class="stat-v">6 × 15.1″ LCD</div></div>
+          <div class="stat-card"><div class="stat-l">FMS COMPUTERS</div><div class="stat-v">2 (Dual Redundant)</div></div>
+          <div class="stat-card"><div class="stat-l">AUTOPILOT</div><div class="stat-v">CAT IIIb (10 ft DH)</div></div>
+          <div class="stat-card"><div class="stat-l">EFIS SOURCE</div><div class="stat-v">3 × ADIRU</div></div>
+        </div>
+        <div class="callout"><div class="callout-lbl">ADIRU</div><div class="callout-txt">Air Data / Inertial Reference Unit — combines pitot-static measurements with a laser ring-gyro inertial platform. It computes TAS, IAS, Mach, altitude, vertical speed, attitude, heading, and position simultaneously.</div></div>`,
+      physics:`
+        <div class="section-label">Pitot-Static Measurement Physics</div>
+        <p class="eng">Airspeed is measured by comparing <strong>stagnation (total) pressure</strong> from the pitot probe with <strong>static pressure</strong> from flush static ports. The <strong>Indicated Airspeed (IAS)</strong> is derived from the incompressible Bernoulli equation, while <strong>True Airspeed (TAS)</strong> corrects for density.</p>
+        <div class="eq-box"><span class="eq-label">BERNOULLI (INCOMPRESSIBLE)</span>$$p_0 = p_s + \\frac{1}{2}\\rho V^2 \\ \\Rightarrow \\ V_{IAS} = \\sqrt{\\frac{2(p_0-p_s)}{\\rho_{SL}}}$$</div>
+        <p class="eng">where $\\rho_{SL} = 1.225$ kg/m³ is standard sea-level density. Since actual air density at altitude is lower, TAS exceeds IAS. The relationship:</p>
+        <div class="eq-box"><span class="eq-label">TAS FROM IAS</span>$$V_{TAS} = V_{IAS} \\cdot \\sqrt{\\frac{\\rho_{SL}}{\\rho}} = V_{IAS} \\cdot \\sqrt{\\frac{1.225}{\\rho_{alt}}}$$</div>
+        <div class="deriv-step"><div class="step-num">Ex.</div><div class="step-body">At FL350, $\\rho \\approx 0.380$ kg/m³. For $V_{IAS} = 250$ kt: $V_{TAS} = 250 \\times \\sqrt{1.225/0.380} = 250 \\times 1.796 \\approx 449$ kt</div></div>
+        <div class="section-label">Inertial Navigation</div>
+        <p class="eng">The laser ring gyro measures angular rate via the <strong>Sagnac effect</strong>: counter-rotating laser beams travel different path lengths when the platform rotates, producing a measurable fringe shift: $\\Delta\\phi = \\frac{8\\pi A \\Omega}{\\lambda c}$, where $A$ is loop area and $\\Omega$ is rotation rate.</p>`,
+      math:`
+        <div class="section-label">Altitude Measurement</div>
+        <div class="eq-box"><span class="eq-label">BAROMETRIC ALTITUDE (TROPOSPHERE)</span>$$h = \\frac{T_{SL}}{L}\\left[1 - \\left(\\frac{p}{p_{SL}}\\right)^{\\frac{RL}{gM_a}}\\right]$$</div>
+        <p class="eng">where $T_{SL} = 288.15$ K, $L = 0.0065$ K/m (lapse rate), $R = 8.314$ J/(mol·K), $g = 9.80665$ m/s², $M_a = 0.028964$ kg/mol.</p>
+        <div class="eq-box"><span class="eq-label">COMPRESSIBILITY CORRECTION TO IAS</span>$$V_{CAS} = a_{SL}\\sqrt{5\\left[\\left(\\frac{p_0-p_s}{p_{SL}}+1\\right)^{2/7}-1\\right]}$$</div>
+        <div class="eq-box"><span class="eq-label">MACH NUMBER FROM PITOT</span>$$M = \\sqrt{\\frac{2}{\\gamma-1}\\left[\\left(\\frac{p_0}{p_s}\\right)^{\\frac{\\gamma-1}{\\gamma}}-1\\right]} = \\sqrt{5\\left[\\left(\\frac{p_0}{p_s}\\right)^{2/7}-1\\right]}$$</div>
+        <div class="note"><div class="note-lbl">Autopilot Control Law</div><div class="note-txt">The autopilot pitch channel implements a PID controller: $\\delta_e = K_p\\,e + K_i\\int e\\,dt + K_d\\dot{e}$, where $e$ is altitude error. Gain scheduling adjusts $K_p, K_i, K_d$ with airspeed and altitude.</div></div>`,
+      calc:`
+        <div class="calc-title">⚙ TAS / Mach Calculator</div>
+        <div class="calc-box">
+          <div class="calc-row"><label>IAS (knots)</label><input id="cc-ias" type="number" value="250" step="1"><span>kt</span></div>
+          <div class="calc-row"><label>Altitude</label><input id="cc-alt" type="number" value="35000" step="500"><span>ft</span></div>
+          <div class="calc-row"><label>OAT</label><input id="cc-oat" type="number" value="-56" step="1"><span>°C</span></div>
+          <button class="calc-btn" onclick="calcCockpit()">COMPUTE</button>
+          <div class="calc-result" id="cockpit-result">Press COMPUTE</div>
+        </div>`
+    }
+  },
+
+  fuselage:{
+    label:'AIRFRAME · PRIMARY STRUCTURE', title:'Fuselage & Pressure Vessel', color:'c1',
+    tabs:{
+      overview:`
+        <div class="section-label">Structural Description</div>
+        <p class="eng">The fuselage is a <strong>pressurised semi-monocoque cylinder</strong> — external loads are shared between the skin (stressed skin) and internal frames, longerons, and stringers. The 737 fuselage is primarily 2024-T3 aluminium alloy with select applications of CFRP (carbon fibre reinforced polymer) on secondary structures.</p>
+        <p class="eng">It maintains cabin altitude equivalent to 6,000–8,000 ft while flying at 35,000 ft, requiring a <strong>differential pressure</strong> of ~7.8 PSI (53.8 kPa) across the skin at all times. Each pressure cycle stresses the skin — hence mandatory inspection intervals by flight-cycle count.</p>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-l">TOTAL LENGTH</div><div class="stat-v">42.1 m</div></div>
+          <div class="stat-card"><div class="stat-l">EXT. DIAMETER</div><div class="stat-v">3.76 m</div></div>
+          <div class="stat-card"><div class="stat-l">CABIN WIDTH</div><div class="stat-v">3.53 m</div></div>
+          <div class="stat-card"><div class="stat-l">MATERIAL</div><div class="stat-v">2024-T3 Al</div></div>
+          <div class="stat-card"><div class="stat-l">ΔP (CRUISE)</div><div class="stat-v">7.8 PSI</div></div>
+          <div class="stat-card"><div class="stat-l">CYCLES (LIFE)</div><div class="stat-v">~75,000</div></div>
+        </div>`,
+      physics:`
+        <div class="section-label">Hoop & Longitudinal Stress</div>
+        <p class="eng">A pressurised cylinder under internal pressure $\\Delta p$ develops two principal stresses: <strong>hoop stress</strong> (circumferential) and <strong>longitudinal stress</strong> (axial). The hoop stress is always twice the longitudinal — so the fuselage skin is primarily designed against hoop failure.</p>
+        <div class="eq-box"><span class="eq-label">HOOP (CIRCUMFERENTIAL) STRESS</span>$$\\sigma_\\theta = \\frac{\\Delta p \\cdot r}{t}$$</div>
+        <div class="eq-box"><span class="eq-label">LONGITUDINAL (AXIAL) STRESS</span>$$\\sigma_L = \\frac{\\Delta p \\cdot r}{2t}$$</div>
+        <p class="eng">For the 737 fuselage: $r = 1.88$ m, $t \\approx 1.6$ mm = 0.0016 m, $\\Delta p = 53{,}800$ Pa:</p>
+        <div class="deriv-step"><div class="step-num">1.</div><div class="step-body">$\\sigma_\\theta = \\frac{53800 \\times 1.88}{0.0016} = 63.2$ MPa (hoop)</div></div>
+        <div class="deriv-step"><div class="step-num">2.</div><div class="step-body">$\\sigma_L = \\frac{53800 \\times 1.88}{0.0032} = 31.6$ MPa (longitudinal)</div></div>
+        <div class="deriv-step"><div class="step-num">3.</div><div class="step-body">2024-T3 yield strength $\\approx 345$ MPa → Safety factor $= 345/63.2 \\approx 5.5\\times$</div></div>
+        <div class="callout"><div class="callout-lbl">Fatigue Analysis</div><div class="callout-txt">Every pressurisation/depressurisation cycle applies a stress range. By Miner's Rule, cumulative fatigue damage $D = \\sum n_i/N_i$ where $n_i$ = applied cycles and $N_i$ = cycles to failure at stress level $i$. FAA requires retirement when $D$ approaches 1.0.</div></div>`,
+      math:`
+        <div class="section-label">Thin-Walled Pressure Vessel Theory</div>
+        <div class="eq-box"><span class="eq-label">VON MISES YIELD CRITERION</span>$$\\sigma_{VM} = \\sqrt{\\sigma_\\theta^2 - \\sigma_\\theta\\sigma_L + \\sigma_L^2} \\leq \\sigma_{yield}$$</div>
+        <div class="eq-box"><span class="eq-label">MINER'S RULE — CUMULATIVE DAMAGE</span>$$D = \\sum_{i=1}^{k}\\frac{n_i}{N_i} \\leq 1$$</div>
+        <div class="eq-box"><span class="eq-label">S-N CURVE (WÖHLER, LOG-LOG)</span>$$\\log N = a - b\\log(\\Delta\\sigma) \\ \\Leftrightarrow \\ N = C(\\Delta\\sigma)^{-m}$$</div>
+        <div class="eq-box"><span class="eq-label">FRACTURE MECHANICS — STRESS INTENSITY</span>$$K_I = \\sigma\\sqrt{\\pi a} \\cdot F(a/W) \\leq K_{IC}$$</div>
+        <p class="eng">where $a$ is crack half-length, $F(a/W)$ is a geometry correction factor, and $K_{IC}$ is plane-strain fracture toughness (~37 MPa√m for 2024-T3). Crack growth rate is governed by the Paris Law: $da/dN = C(\\Delta K)^m$.</p>`,
+      calc:`
+        <div class="calc-title">⚙ Hoop Stress Calculator</div>
+        <div class="calc-box">
+          <div class="calc-row"><label>Cabin altitude (ft)</label><input id="fc-cabin" type="number" value="8000" step="500"><span>ft</span></div>
+          <div class="calc-row"><label>Flight altitude (ft)</label><input id="fc-flight" type="number" value="35000" step="1000"><span>ft</span></div>
+          <div class="calc-row"><label>Fuselage radius (m)</label><input id="fc-r" type="number" value="1.88" step="0.01"><span>m</span></div>
+          <div class="calc-row"><label>Skin thickness (mm)</label><input id="fc-t" type="number" value="1.6" step="0.1"><span>mm</span></div>
+          <button class="calc-btn" onclick="calcFuselage()">COMPUTE</button>
+          <div class="calc-result" id="fuse-result">Press COMPUTE</div>
+        </div>`
+    }
+  },
+
+  windows:{
+    label:'CABIN · TRANSPARENCY SYSTEM', title:'Passenger Windows', color:'c3',
+    tabs:{
+      overview:`
+        <div class="section-label">Multi-Pane Architecture</div>
+        <p class="eng">Aircraft windows are a <strong>three-pane acrylic assembly</strong>: the outer structural pane, the inner structural (fail-safe) pane, and the inner scratch (dust) pane. They are oval to distribute stress uniformly — circular corners in the de Havilland Comet's square windows caused stress concentrations that led to catastrophic fatigue failures (1954).</p>
+        <p class="eng">The small <strong>breather hole</strong> (~1.5 mm diameter) in the inner pane ensures the pressure differential is always borne by the outer structural pane, preserving the inner as a fail-safe backup. If the outer pane fails, the inner takes the load while cabin integrity is maintained.</p>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-l">PANES</div><div class="stat-v">3 Layers</div></div>
+          <div class="stat-card"><div class="stat-l">MATERIAL</div><div class="stat-v">Stretched Acrylic</div></div>
+          <div class="stat-card"><div class="stat-l">TOTAL THICKNESS</div><div class="stat-v">~19 mm</div></div>
+          <div class="stat-card"><div class="stat-l">U-VALUE</div><div class="stat-v">~2.2 W/m²K</div></div>
+        </div>
+        <div class="callout"><div class="callout-lbl">Stress Concentration Factor</div><div class="callout-txt">An elliptical hole in a plate under uniaxial tension has stress concentration $K_t = 1 + 2a/b$ where $a$ and $b$ are semi-axes. For a circle, $K_t = 3$. Oval windows (with $a \approx 1.5b$) reduce peak stress vs. a circle, and far less than the infinite $K_t$ of a sharp corner.</div></div>`,
+      physics:`
+        <div class="section-label">Stress Around an Elliptical Aperture</div>
+        <p class="eng">The stress concentration around an elliptical hole in an infinite plate under far-field stress $\\sigma_0$ is given by the <strong>Inglis solution</strong>:</p>
+        <div class="eq-box"><span class="eq-label">TANGENTIAL STRESS AT HOLE EDGE (INGLIS, 1913)</span>$$\\sigma_{\\theta,max} = \\sigma_0\\left(1 + \\frac{2a}{b}\\right)$$</div>
+        <p class="eng">For a <strong>circle</strong> ($a = b$): $\\sigma_{\\theta,max} = 3\\sigma_0$ — i.e., stress is tripled at the edge. For the oval window geometry (approx. $a = 1.5b$):</p>
+        <div class="deriv-step"><div class="step-num">1.</div><div class="step-body">$K_t = 1 + 2(1.5) = 4.0$ in worst axis — but window is loaded biaxially (hoop + longitudinal)</div></div>
+        <div class="deriv-step"><div class="step-num">2.</div><div class="step-body">Under biaxial loading $\\sigma_x, \\sigma_y$: $\\sigma_{\\theta} = \\sigma_x + \\sigma_y - 2(\\sigma_x-\\sigma_y)\\cos 2\\theta$ — corners with smooth curvature dramatically reduce peak</div></div>
+        <div class="deriv-step"><div class="step-num">3.</div><div class="step-body">Rounded corners with radius $r_c$ modify effective $K_t \\approx 1 + 2\\sqrt{a/r_c}$ — the larger the corner radius, the lower the concentration</div></div>`,
+      math:`
+        <div class="section-label">Thermal Analysis of Window</div>
+        <div class="eq-box"><span class="eq-label">CONDUCTION THROUGH MULTI-LAYER WALL</span>$$\\dot{Q} = \\frac{T_{cabin}-T_{OAT}}{\\sum_{i}\\frac{L_i}{k_i A} + \\frac{1}{h_i A} + \\frac{1}{h_o A}}$$</div>
+        <p class="eng">At FL350, OAT ≈ −56°C, cabin ≈ +22°C. With acrylic conductivity $k = 0.19$ W/mK, the window assembly loses significant heat — handled by the cabin conditioning system.</p>
+        <div class="eq-box"><span class="eq-label">STRESS INTENSITY FACTOR — EDGE CRACK</span>$$K_I = 1.12\\,\\sigma\\sqrt{\\pi a}$$</div>
+        <div class="eq-box"><span class="eq-label">FRACTURE TOUGHNESS — ACRYLIC</span>$$K_{IC,acrylic} \\approx 1.0 \\ \\text{MPa}\\sqrt{\\text{m}}$$</div>
+        <div class="note"><div class="note-lbl">Design Requirement</div><div class="note-txt">FAR 25.775 requires aircraft windows to withstand a pressure differential of at least 1.33× maximum design differential, plus must not crack under a 4-lb bird impact at $V_c$ (design cruise speed).</div></div>`,
+      calc:`
+        <div class="calc-title">⚙ Stress Concentration Calculator</div>
+        <div class="calc-box">
+          <div class="calc-row"><label>Far-field stress σ₀ (MPa)</label><input id="wc-s" type="number" value="63" step="1"><span>MPa</span></div>
+          <div class="calc-row"><label>Ellipse semi-axis a (mm)</label><input id="wc-a" type="number" value="120" step="1"><span>mm</span></div>
+          <div class="calc-row"><label>Ellipse semi-axis b (mm)</label><input id="wc-b" type="number" value="80" step="1"><span>mm</span></div>
+          <button class="calc-btn" onclick="calcWindows()">COMPUTE</button>
+          <div class="calc-result" id="win-result">Press COMPUTE</div>
+        </div>`
+    }
+  },
+
+  wing:{
+    label:'AERODYNAMICS · LIFT GENERATION', title:'Main Wings & Aerodynamics', color:'c2',
+    tabs:{
+      overview:`
+        <div class="section-label">Wing Geometry</div>
+        <p class="eng">The 737 Max wing is a <strong>swept, tapered, cambered monoplane</strong> with a supercritical airfoil section (NASA SC series). The 25° quarter-chord sweep delays the onset of wave drag by reducing the component of flow normal to the leading edge — effectively reducing the effective Mach number seen by the airfoil section.</p>
+        <p class="eng">Wings contain <strong>integral fuel tanks</strong> within sealed wing boxes (centre tank + two main tanks), high-lift devices (leading edge slats, trailing edge flaps), ailerons, and spoilers. The wing box is the primary structural spine — a multi-spar torque box of aluminium alloy with CFRP ribs.</p>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-l">WINGSPAN</div><div class="stat-v">35.9 m</div></div>
+          <div class="stat-card"><div class="stat-l">WING AREA</div><div class="stat-v">125.6 m²</div></div>
+          <div class="stat-card"><div class="stat-l">ASPECT RATIO</div><div class="stat-v">10.27</div></div>
+          <div class="stat-card"><div class="stat-l">SWEEP (QC)</div><div class="stat-v">25°</div></div>
+          <div class="stat-card"><div class="stat-l">TAPER RATIO</div><div class="stat-v">0.24</div></div>
+          <div class="stat-card"><div class="stat-l">FUEL CAPACITY</div><div class="stat-v">26,022 L</div></div>
+        </div>`,
+      physics:`
+        <div class="section-label">Lift Generation — Two Theories</div>
+        <p class="eng"><strong>Bernoulli's Principle</strong>: The cambered airfoil accelerates flow over the upper surface (longer path), reducing static pressure above. The pressure differential $\\Delta p = p_{lower} - p_{upper}$ integrated over the surface yields lift.</p>
+        <div class="eq-box"><span class="eq-label">BERNOULLI EQUATION (STREAMLINE)</span>$$p + \\frac{1}{2}\\rho V^2 + \\rho g h = \\text{const} \\ \\Rightarrow \\ p_L - p_U = \\frac{1}{2}\\rho(V_U^2 - V_L^2)$$</div>
+        <p class="eng"><strong>Circulation Theory (Kutta-Joukowski)</strong>: Lift per unit span equals the product of fluid density, velocity, and circulation $\\Gamma$ around the airfoil:</p>
+        <div class="eq-box"><span class="eq-label">KUTTA-JOUKOWSKI THEOREM</span>$$L' = \\rho_\\infty V_\\infty \\Gamma$$</div>
+        <p class="eng"><strong>Newton's 3rd Law view</strong>: The wing deflects a mass of air downward — generating a reaction lift force upward. The downwash angle $\\epsilon$ induces drag (induced drag).</p>
+        <div class="eq-box"><span class="eq-label">LIFT EQUATION</span>$$L = \\frac{1}{2}\\rho V^2 S C_L = W \\ (\\text{in level flight})$$</div>
+        <div class="deriv-step"><div class="step-num">At cruise</div><div class="step-body">$\\rho = 0.380$ kg/m³, $V = 230$ m/s, $S = 125.6$ m², $W = 702{,}000$ N (MTOW×g):<br>$C_L = \\frac{2W}{\\rho V^2 S} = \\frac{2×702000}{0.380×230^2×125.6} = \\frac{1{,}404{,}000}{2{,}528{,}192} \\approx 0.555$</div></div>`,
+      math:`
+        <div class="section-label">Aerofoil Theory & Wing Equations</div>
+        <div class="eq-box"><span class="eq-label">THIN AIRFOIL — LIFT SLOPE</span>$$C_L = 2\\pi(\\alpha - \\alpha_0) \\ \\Rightarrow \\ \\frac{dC_L}{d\\alpha} = 2\\pi \\ \\text{rad}^{-1}$$</div>
+        <div class="eq-box"><span class="eq-label">FINITE WING — PRANDTL LIFTING LINE</span>$$C_L = \\frac{2\\pi(\\alpha-\\alpha_0)}{1 + \\frac{2}{AR}(1+\\tau)} \\ , \\quad AR = \\frac{b^2}{S}$$</div>
+        <div class="eq-box"><span class="eq-label">INDUCED DRAG COEFFICIENT</span>$$C_{D_i} = \\frac{C_L^2}{\\pi e AR}$$</div>
+        <div class="eq-box"><span class="eq-label">OSWALD EFFICIENCY FACTOR (TYPICAL)</span>$$e \\approx 1.78(1-0.045\\,AR^{0.68}) - 0.64 \\approx 0.82 \\ (\\text{swept wing})$$</div>
+        <div class="eq-box"><span class="eq-label">LIFT-TO-DRAG RATIO</span>$$\\frac{L}{D} = \\frac{C_L}{C_{D_0} + C_{D_i}} = \\frac{C_L}{C_{D_0} + \\frac{C_L^2}{\\pi e AR}}$$</div>
+        <p class="eng">Maximum L/D occurs when $C_{D_i} = C_{D_0}$, i.e., $C_{L,opt} = \\sqrt{C_{D_0}\\pi e AR}$. For the 737, $L/D_{max} \\approx 17$.</p>`,
+      calc:`
+        <div class="calc-title">⚙ Lift & Induced Drag Calculator</div>
+        <div class="calc-box">
+          <div class="calc-row"><label>Weight (kg)</label><input id="wg-w" type="number" value="70000" step="1000"><span>kg</span></div>
+          <div class="calc-row"><label>TAS (m/s)</label><input id="wg-v" type="number" value="230" step="1"><span>m/s</span></div>
+          <div class="calc-row"><label>Altitude (ft)</label><input id="wg-a" type="number" value="35000" step="1000"><span>ft</span></div>
+          <div class="calc-row"><label>Wing Area (m²)</label><input id="wg-s" type="number" value="125.6" step="0.1"><span>m²</span></div>
+          <div class="calc-row"><label>Aspect Ratio</label><input id="wg-ar" type="number" value="10.27" step="0.01"><span>—</span></div>
+          <button class="calc-btn" onclick="calcWing()">COMPUTE</button>
+          <div class="calc-result" id="wing-result">Press COMPUTE</div>
+        </div>`
+    }
+  },
+
+  winglet:{
+    label:'AERODYNAMICS · TIP EFFICIENCY', title:'Winglets — Split Scimitar', color:'c1',
+    tabs:{
+      overview:`
+        <div class="section-label">Purpose & Design</div>
+        <p class="eng">Winglets reduce <strong>induced drag</strong> by attenuating the wingtip vortex that forms when high-pressure air from below the wing "leaks" around the tip to the low-pressure region above. The 737 Max uses <strong>Split Scimitar Winglets</strong> — a combined upward-canted blended winglet with a lower strake, developed by Aviation Partners Boeing.</p>
+        <p class="eng">The upward element increases the effective span (and thus aspect ratio) without the structural weight penalty of extending the physical span. The lower strake further reduces vortex strength by splitting the vortex core.</p>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-l">HEIGHT</div><div class="stat-v">2.4 m</div></div>
+          <div class="stat-card"><div class="stat-l">CANT ANGLE</div><div class="stat-v">~22°</div></div>
+          <div class="stat-card"><div class="stat-l">FUEL SAVING</div><div class="stat-v">1.5–2% / trip</div></div>
+          <div class="stat-card"><div class="stat-l">DRAG REDUCTION</div><div class="stat-v">~5% induced</div></div>
+        </div>`,
+      physics:`
+        <div class="section-label">Induced Drag & Vortex Physics</div>
+        <p class="eng">A finite wing generates a <strong>trailing vortex system</strong>. At the tip, the pressure difference drives a spanwise flow that rolls into a concentrated vortex. This vortex induces a downwash behind the wing, tilting the local lift vector rearward — creating <strong>induced drag</strong>.</p>
+        <div class="eq-box"><span class="eq-label">INDUCED DOWNWASH ANGLE</span>$$\\epsilon = \\frac{C_L}{\\pi \\cdot AR \\cdot e} \\ \\text{(rad)}$$</div>
+        <div class="eq-box"><span class="eq-label">INDUCED DRAG FORCE</span>$$D_i = L \\cdot \\epsilon = \\frac{L^2}{\\frac{1}{2}\\rho V^2 \\pi e b^2}$$</div>
+        <p class="eng">The winglet effectively increases $b$ (span) without adding the bending moment of physical span extension. An ideal winglet of height $h$ at 90° increases effective span by approximately $2h\\eta$ where $\\eta$ is the winglet efficiency factor (~0.4–0.6).</p>
+        <div class="eq-box"><span class="eq-label">EFFECTIVE SPAN WITH WINGLET</span>$$b_{eff} \\approx b + 2h\\eta_{winglet}$$</div>`,
+      math:`
+        <div class="section-label">Winglet Optimisation Theory</div>
+        <div class="eq-box"><span class="eq-label">INDUCED DRAG WITH WINGLET</span>$$C_{D_i,wl} = \\frac{C_L^2}{\\pi e_{wl} AR_{wl}}$$</div>
+        <div class="eq-box"><span class="eq-label">EFFICIENCY RATIO</span>$$\\frac{e_{wl}}{e} = 1 + \\frac{2h}{b}\\kappa \\left(2-\\frac{h}{b}\\kappa\\right)$$</div>
+        <p class="eng">where $\\kappa = \\eta\\cos\\delta$ corrects for winglet cant angle $\\delta$ and efficiency $\\eta$. For Split Scimitar: $h = 2.4$ m, $b = 35.9$ m, $\\delta \\approx 22°$, $\\eta \\approx 0.5$:</p>
+        <div class="deriv-step"><div class="step-num">1.</div><div class="step-body">$\\kappa = 0.5 \\times \\cos 22° = 0.5 \\times 0.927 = 0.464$</div></div>
+        <div class="deriv-step"><div class="step-num">2.</div><div class="step-body">$\\Delta e/e = 2(2.4/35.9)(0.464)(2 - (2.4/35.9)(0.464)) \\approx 0.062$</div></div>
+        <div class="deriv-step"><div class="step-num">3.</div><div class="step-body">$C_{D_i}$ reduction $\\approx 6.2\\%$ → fuel burn reduction ~1.8%</div></div>`,
+      calc:`
+        <div class="calc-title">⚙ Winglet Benefit Estimator</div>
+        <div class="calc-box">
+          <div class="calc-row"><label>Wingspan b (m)</label><input id="wl-b" type="number" value="35.9" step="0.1"><span>m</span></div>
+          <div class="calc-row"><label>Winglet height h (m)</label><input id="wl-h" type="number" value="2.4" step="0.1"><span>m</span></div>
+          <div class="calc-row"><label>Cant angle δ (°)</label><input id="wl-d" type="number" value="22" step="1"><span>°</span></div>
+          <div class="calc-row"><label>Efficiency η</label><input id="wl-e" type="number" value="0.5" step="0.05" min="0.1" max="1"><span>—</span></div>
+          <button class="calc-btn" onclick="calcWinglet()">COMPUTE</button>
+          <div class="calc-result" id="wl-result">Press COMPUTE</div>
+        </div>`
+    }
+  },
+
+  engine:{
+    label:'PROPULSION · CFM LEAP-1B', title:'Turbofan Engine', color:'c2',
+    tabs:{
+      overview:`
+        <div class="section-label">Engine Architecture</div>
+        <p class="eng">The CFM LEAP-1B is a <strong>high-bypass two-spool turbofan</strong>. "High bypass" means most thrust comes from the large fan bypassing the core — at bypass ratio 9:1, nine parts of air bypass the combustor for every one that passes through it. This makes it far more efficient and quieter than a turbojet.</p>
+        <p class="eng">The engine has two concentric shafts: the <strong>Low Pressure (LP) shaft</strong> connects the fan and LP turbine; the <strong>High Pressure (HP) shaft</strong> connects the HP compressor and HP turbine. Each spool runs at its own optimal RPM.</p>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-l">THRUST (SEA LVL)</div><div class="stat-v">130 kN each</div></div>
+          <div class="stat-card"><div class="stat-l">BYPASS RATIO</div><div class="stat-v">9 : 1</div></div>
+          <div class="stat-card"><div class="stat-l">FAN DIAMETER</div><div class="stat-v">1.76 m</div></div>
+          <div class="stat-card"><div class="stat-l">OVERALL PRESS. RATIO</div><div class="stat-v">40 : 1</div></div>
+          <div class="stat-card"><div class="stat-l">TIT (TURBINE INLET)</div><div class="stat-v">~1,700°C</div></div>
+          <div class="stat-card"><div class="stat-l">WEIGHT (DRY)</div><div class="stat-v">2,780 kg</div></div>
+        </div>`,
+      physics:`
+        <div class="section-label">Thermodynamic Cycle — Brayton Cycle</div>
+        <p class="eng">The gas turbine operates on the <strong>ideal Brayton cycle</strong>: isentropic compression → constant-pressure heat addition → isentropic expansion. Real engines deviate due to compressor/turbine inefficiencies and combustion losses.</p>
+        <div class="eq-box"><span class="eq-label">IDEAL BRAYTON THERMAL EFFICIENCY</span>$$\\eta_{th} = 1 - \\frac{T_1}{T_2} = 1 - \\frac{1}{r_p^{(\\gamma-1)/\\gamma}}$$</div>
+        <p class="eng">where $r_p = p_3/p_1$ is the overall pressure ratio. For $r_p = 40$, $\\gamma = 1.4$:</p>
+        <div class="deriv-step"><div class="step-num">1.</div><div class="step-body">$\\eta_{th} = 1 - 1/40^{0.4/1.4} = 1 - 1/40^{0.286} = 1 - 1/3.13 = 0.680$ → 68% ideal</div></div>
+        <div class="deriv-step"><div class="step-num">2.</div><div class="step-body">Real efficiency (with $\\eta_c = 0.88, \\eta_t = 0.90$) drops to ~45–50% at cruise</div></div>
+        <div class="eq-box"><span class="eq-label">THRUST EQUATION (ROCKET/JET ANALOGY)</span>$$F = \\dot{m}(V_j - V_0) + (p_j - p_0)A_j$$</div>
+        <p class="eng">where $\\dot{m}$ is total mass flow, $V_j$ is jet exhaust velocity, $V_0$ is flight velocity, and $(p_j-p_0)A_j$ is the pressure thrust term.</p>`,
+      math:`
+        <div class="section-label">Full Engine Thermodynamic Equations</div>
+        <div class="eq-box"><span class="eq-label">ISENTROPIC COMPRESSION (1→2)</span>$$T_2 = T_1 r_p^{(\\gamma-1)/\\gamma} \\ , \\quad \\text{Real: } T_{2r} = T_1 + \\frac{T_2-T_1}{\\eta_c}$$</div>
+        <div class="eq-box"><span class="eq-label">COMBUSTOR HEAT ADDITION (2→3)</span>$$\\dot{Q} = \\dot{m}_f \\cdot LHV = (\\dot{m}_a + \\dot{m}_f)c_p T_3 - \\dot{m}_a c_p T_2$$</div>
+        <div class="eq-box"><span class="eq-label">TURBINE WORK = COMPRESSOR WORK (SHAFT BALANCE)</span>$$c_p(T_3-T_4) = c_p(T_2-T_1) + \\text{Fan work} / \\dot{m}_{core}$$</div>
+        <div class="eq-box"><span class="eq-label">SPECIFIC FUEL CONSUMPTION</span>$$TSFC = \\frac{\\dot{m}_f}{F} \\ \\text{(kg/s/N)} \\ \\Rightarrow \\ \\approx 15.5 \\ \\text{mg/N/s at cruise}$$</div>
+        <div class="eq-box"><span class="eq-label">PROPULSIVE EFFICIENCY</span>$$\\eta_p = \\frac{2}{1 + V_j/V_0} = \\frac{2V_0}{V_0 + V_j}$$</div>
+        <p class="eng">High bypass = lower $V_j$ relative to $V_0$ → higher $\\eta_p$. LEAP-1B achieves $\\eta_p \\approx 0.72$ at cruise.</p>`,
+      calc:`
+        <div class="calc-title">⚙ Brayton Cycle Efficiency Calculator</div>
+        <div class="calc-box">
+          <div class="calc-row"><label>Pressure ratio rₚ</label><input id="ec-rp" type="number" value="40" step="1" min="5"><span>—</span></div>
+          <div class="calc-row"><label>Compressor eff. ηc</label><input id="ec-nc" type="number" value="0.88" step="0.01" min="0.5" max="1"><span>—</span></div>
+          <div class="calc-row"><label>Turbine eff. ηt</label><input id="ec-nt" type="number" value="0.90" step="0.01" min="0.5" max="1"><span>—</span></div>
+          <div class="calc-row"><label>Inlet Temp T₁ (K)</label><input id="ec-t1" type="number" value="217" step="1"><span>K</span></div>
+          <div class="calc-row"><label>TIT T₃ (K)</label><input id="ec-t3" type="number" value="1900" step="10"><span>K</span></div>
+          <button class="calc-btn" onclick="calcEngine()">COMPUTE</button>
+          <div class="calc-result" id="eng-result">Press COMPUTE</div>
+        </div>`
+    }
+  },
+
+  aileron:{
+    label:'FLIGHT CONTROLS · ROLL & HIGH-LIFT', title:'Ailerons, Flaps & Slats', color:'c3',
+    tabs:{
+      overview:`
+        <div class="section-label">Control Surface Roles</div>
+        <p class="eng"><strong>Ailerons</strong> (outer trailing edge) control roll: left aileron up / right aileron down → left wing lift decreases / right increases → right roll. <strong>Flaps</strong> (inner TE) increase wing camber and area for takeoff/landing. <strong>Slats</strong> (leading edge) extend forward, increasing the wing's critical angle of attack by energising the boundary layer. <strong>Spoilers</strong> (upper wing surface) destroy lift symmetrically (as airbrakes) or asymmetrically (to assist roll).</p>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-l">AILERON TRAVEL</div><div class="stat-v">±25°</div></div>
+          <div class="stat-card"><div class="stat-l">FLAP MAX</div><div class="stat-v">40° (Flap 40)</div></div>
+          <div class="stat-card"><div class="stat-l">ΔCL,max (FLAPS)</div><div class="stat-v">+1.1 approx</div></div>
+          <div class="stat-card"><div class="stat-l">SPOILERS PER WING</div><div class="stat-v">6 panels</div></div>
+        </div>`,
+      physics:`
+        <div class="section-label">Aileron Roll Physics</div>
+        <p class="eng">Deflecting an aileron changes local camber, shifting the lift distribution asymmetrically. The rolling moment $L_{roll}$ about the CG:</p>
+        <div class="eq-box"><span class="eq-label">ROLLING MOMENT FROM AILERONS</span>$$L_{roll} = \\frac{1}{2}\\rho V^2 S b\\, C_{l_\\delta}\\, \\delta_a$$</div>
+        <p class="eng">where $C_{l_\\delta}$ is the aileron roll power derivative (typ. 0.04–0.08 per radian), $\\delta_a$ is aileron deflection (rad), $b$ = wingspan.</p>
+        <div class="section-label">High-Lift: Flap Effect</div>
+        <p class="eng">A trailing-edge flap increases wing camber. From thin airfoil theory, the lift increment due to a plain flap of chord ratio $c_f/c$ at deflection $\\delta_f$:</p>
+        <div class="eq-box"><span class="eq-label">LIFT INCREMENT DUE TO FLAP</span>$$\\Delta C_L = \\frac{\\partial C_L}{\\partial \\delta_f}\\delta_f = 2\\pi \\frac{\\partial \\alpha_{ZL}}{\\partial \\delta_f}\\delta_f$$</div>
+        <div class="eq-box"><span class="eq-label">FLAP EFFECTIVENESS (PLAIN FLAP)</span>$$\\eta_f = \\frac{\\partial \\alpha_{ZL}}{\\partial \\delta_f} = \\frac{1}{\\pi}(\\theta_f - \\sin\\theta_f) \\ , \\quad \\cos\\theta_f = 1-2c_f/c$$</div>`,
+      math:`
+        <div class="section-label">Control Effectiveness Equations</div>
+        <div class="eq-box"><span class="eq-label">ROLL RATE (STEADY STATE)</span>$$\\frac{pb}{2V} = -\\frac{C_{l_\\delta}\\delta_a}{C_{l_p}}$$</div>
+        <p class="eng">where $C_{l_p}$ is the roll damping derivative (typically −0.4 to −0.6) and $p$ is roll rate (rad/s).</p>
+        <div class="eq-box"><span class="eq-label">MAX LIFT COEFFICIENT WITH FLAPS</span>$$C_{L,max,flap} = C_{L,max,clean} + \\Delta C_{L,flap}\\cos\\Lambda_{TE}$$</div>
+        <div class="eq-box"><span class="eq-label">STALL SPEED WITH FLAPS</span>$$V_s = \\sqrt{\\frac{2W}{\\rho S C_{L,max}}} \\ \\Rightarrow \\ V_{s,flap} = V_{s,clean}\\sqrt{\\frac{C_{L,max,clean}}{C_{L,max,flap}}}$$</div>
+        <p class="eng">At Flap 40: $C_{L,max}$ increases from ~1.45 to ~2.55, reducing stall speed by $\\sqrt{1.45/2.55}\\approx 0.75$ → 25% stall speed reduction.</p>`,
+      calc:`
+        <div class="calc-title">⚙ Stall Speed Calculator</div>
+        <div class="calc-box">
+          <div class="calc-row"><label>Weight (kg)</label><input id="ac-w" type="number" value="70000" step="1000"><span>kg</span></div>
+          <div class="calc-row"><label>Wing Area S (m²)</label><input id="ac-s" type="number" value="125.6" step="0.1"><span>m²</span></div>
+          <div class="calc-row"><label>CL,max (Clean)</label><input id="ac-cll" type="number" value="1.45" step="0.05"><span>—</span></div>
+          <div class="calc-row"><label>CL,max (Flaps)</label><input id="ac-clf" type="number" value="2.55" step="0.05"><span>—</span></div>
+          <div class="calc-row"><label>Altitude (ft)</label><input id="ac-a" type="number" value="0" step="500"><span>ft</span></div>
+          <button class="calc-btn" onclick="calcAileron()">COMPUTE</button>
+          <div class="calc-result" id="ail-result">Press COMPUTE</div>
+        </div>`
+    }
+  },
+
+  tail:{
+    label:'EMPENNAGE · YAW CONTROL', title:'Vertical Stabilizer & Rudder', color:'c3',
+    tabs:{
+      overview:`
+        <div class="section-label">Function & Sizing</div>
+        <p class="eng">The <strong>vertical tail (fin)</strong> provides yaw stability — a weathervane effect that keeps the nose aligned with the relative wind. The <strong>rudder</strong> (movable trailing portion, ~35% of fin area) provides active yaw control for crosswind landing, engine-out emergencies, and coordinated turns.</p>
+        <p class="eng">Fin size is driven by the critical <strong>engine-out at V1</strong> (decision speed) case: at minimum control speed $V_{MC}$, the rudder must generate enough yawing moment to overcome the asymmetric thrust of one engine at max TO thrust.</p>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-l">FIN HEIGHT</div><div class="stat-v">~7.2 m</div></div>
+          <div class="stat-card"><div class="stat-l">RUDDER TRAVEL</div><div class="stat-v">±27°</div></div>
+          <div class="stat-card"><div class="stat-l">MATERIAL</div><div class="stat-v">Al + CFRP skins</div></div>
+          <div class="stat-card"><div class="stat-l">VMC (APPROX)</div><div class="stat-v">~118 kt IAS</div></div>
+        </div>`,
+      physics:`
+        <div class="section-label">Yaw Stability & Rudder Authority</div>
+        <div class="eq-box"><span class="eq-label">YAWING MOMENT FROM ASYMMETRIC THRUST</span>$$N_{engine} = T_{out}\\cdot y_{eng}$$</div>
+        <div class="eq-box"><span class="eq-label">YAWING MOMENT FROM RUDDER</span>$$N_{rudder} = \\frac{1}{2}\\rho V^2 S_v l_v C_{N_\\delta r}\\delta_r$$</div>
+        <p class="eng">where $S_v$ is vertical tail area, $l_v$ is moment arm from CG to aerodynamic centre of fin, $C_{N_{\\delta r}}$ is rudder control power derivative, $\\delta_r$ is rudder deflection. For equilibrium: $N_{rudder} = N_{engine}$.</p>
+        <div class="eq-box"><span class="eq-label">MINIMUM CONTROL SPEED (V_MC)</span>$$V_{MC} = \\sqrt{\\frac{2T_{out}y_{eng}}{\\rho S_v l_v C_{N_{\\delta r}}\\delta_{r,max}}}$$</div>
+        <p class="eng">FAR 25.149 requires $V_{MC} \\leq 1.2 V_S$ at sea level, standard day. The aircraft must maintain a heading within 20° bank using only rudder.</p>`,
+      math:`
+        <div class="section-label">Directional Stability Theory</div>
+        <div class="eq-box"><span class="eq-label">DIRECTIONAL STABILITY DERIVATIVE</span>$$C_{N_\\beta} = C_{N_{\\beta,fuse}} + C_{N_{\\beta,v}} > 0 \\ \\text{(for stability)}$$</div>
+        <div class="eq-box"><span class="eq-label">VERTICAL TAIL CONTRIBUTION</span>$$C_{N_{\\beta,v}} = a_v \\frac{S_v l_v}{S b}(1-\\frac{d\\sigma}{d\\beta})$$</div>
+        <div class="eq-box"><span class="eq-label">DUTCH ROLL FREQUENCY</span>$$\\omega_{DR} = \\sqrt{\\frac{\\rho V^2 S b}{2I_z}\\left[C_{N_\\beta} + \\frac{C_{N_r}C_{L_\\beta} - C_{N_\\beta}C_{L_r}}{C_{L_\\beta} - C_{N_r}}\\right]}$$</div>
+        <div class="note"><div class="note-lbl">Dutch Roll</div><div class="note-txt">Dutch roll is a combined yaw-roll oscillation. Swept wings have low roll damping $C_{l_p}$ and strong yaw-roll coupling $C_{l_\\beta}$. The Yaw Damper system uses a rate gyro + rudder actuator to add artificial damping to this mode.</div></div>`,
+      calc:`
+        <div class="calc-title">⚙ Rudder Authority Calculator</div>
+        <div class="calc-box">
+          <div class="calc-row"><label>Engine Thrust T (kN)</label><input id="tc-t" type="number" value="130" step="1"><span>kN</span></div>
+          <div class="calc-row"><label>Engine lateral arm y (m)</label><input id="tc-y" type="number" value="5.0" step="0.1"><span>m</span></div>
+          <div class="calc-row"><label>Fin area Sv (m²)</label><input id="tc-sv" type="number" value="22" step="0.5"><span>m²</span></div>
+          <div class="calc-row"><label>Moment arm lv (m)</label><input id="tc-lv" type="number" value="14" step="0.5"><span>m</span></div>
+          <div class="calc-row"><label>V_IAS (kt)</label><input id="tc-v" type="number" value="118" step="1"><span>kt</span></div>
+          <button class="calc-btn" onclick="calcTail()">COMPUTE</button>
+          <div class="calc-result" id="tail-result">Press COMPUTE</div>
+        </div>`
+    }
+  },
+
+  hstab:{
+    label:'EMPENNAGE · PITCH STABILITY', title:'Horizontal Stabilizer & Elevator', color:'c1',
+    tabs:{
+      overview:`
+        <div class="section-label">Pitch Trim System</div>
+        <p class="eng">The horizontal tail provides <strong>pitch stability and trim</strong>. The elevator (movable trailing surface) provides pitch authority. The entire horizontal stabilizer can also be repositioned via an electric jackscrew motor — this is the <strong>stabiliser trim</strong> system used to relieve sustained elevator deflection in cruise.</p>
+        <p class="eng">The MCAS (Maneuvering Characteristics Augmentation System) on the 737 Max used this jackscrew to apply nose-down stabiliser trim when the Angle of Attack sensors detected high AoA, to counter the pitch-up tendency introduced by the forward-mounted LEAP engines.</p>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-l">SPAN</div><div class="stat-v">~14.4 m</div></div>
+          <div class="stat-card"><div class="stat-l">ELEVATOR TRAVEL</div><div class="stat-v">+17°/−25°</div></div>
+          <div class="stat-card"><div class="stat-l">STAB TRIM RANGE</div><div class="stat-v">−1° to +17°</div></div>
+          <div class="stat-card"><div class="stat-l">JACKSCREW DRIVE</div><div class="stat-v">Dual Electric</div></div>
+        </div>`,
+      physics:`
+        <div class="section-label">Longitudinal Static Stability</div>
+        <p class="eng">An aircraft is statically stable in pitch if a perturbation from trim generates a restoring pitching moment. The key parameter is the <strong>static margin (SM)</strong> — distance from Centre of Gravity (CG) to Neutral Point (NP), expressed as fraction of MAC:</p>
+        <div class="eq-box"><span class="eq-label">STATIC MARGIN</span>$$SM = \\frac{x_{NP} - x_{CG}}{\\bar{c}} = -\\frac{C_{m_\\alpha}}{C_{L_\\alpha}} > 0 \\ \\text{(for stability)}$$</div>
+        <div class="eq-box"><span class="eq-label">NEUTRAL POINT LOCATION</span>$$\\frac{x_{NP}}{\\bar{c}} = \\frac{C_{L_{\\alpha,w}}\\bar{x}_{ac,w} + C_{L_{\\alpha,t}}\\frac{S_t}{S}\\frac{l_t}{\\bar{c}}(1-\\frac{d\\varepsilon}{d\\alpha})}{C_{L_{\\alpha,w}} + C_{L_{\\alpha,t}}\\frac{S_t}{S}(1-\\frac{d\\varepsilon}{d\\alpha})}$$</div>
+        <p class="eng">A typical SM of 5–10% MAC provides comfortable stability. Too little → dangerous instability. Too much → heavy control forces and poor manoeuvrability.</p>`,
+      math:`
+        <div class="section-label">Phugoid & Short-Period Modes</div>
+        <p class="eng">Aircraft have two longitudinal dynamic modes: <strong>phugoid</strong> (long period, slow altitude/speed oscillation) and <strong>short-period</strong> (rapid pitch damping).</p>
+        <div class="eq-box"><span class="eq-label">SHORT-PERIOD NATURAL FREQUENCY</span>$$\\omega_{sp} \\approx V\\sqrt{-\\frac{M_\\alpha}{I_y}}$$</div>
+        <div class="eq-box"><span class="eq-label">SHORT-PERIOD DAMPING RATIO</span>$$\\zeta_{sp} = -\\frac{M_q + M_{\\dot{\\alpha}} + Z_\\alpha/V}{2\\omega_{sp}}$$</div>
+        <div class="eq-box"><span class="eq-label">PHUGOID FREQUENCY (LANCHESTER APPROXIMATION)</span>$$\\omega_{ph} \\approx \\frac{g\\sqrt{2}}{V} \\ \\Rightarrow \\ T_{ph} \\approx \\frac{\\pi V\\sqrt{2}}{g}$$</div>
+        <p class="eng">At $V = 230$ m/s cruise: $T_{ph} = \\pi \\times 230 \\times \\sqrt{2} / 9.81 \\approx 104$ seconds — the phugoid is extremely slow and easily controlled by autopilot or even manually.</p>`,
+      calc:`
+        <div class="calc-title">⚙ Static Margin Calculator</div>
+        <div class="calc-box">
+          <div class="calc-row"><label>CG position (% MAC)</label><input id="hc-cg" type="number" value="25" step="0.5"><span>%</span></div>
+          <div class="calc-row"><label>Wing ac (% MAC)</label><input id="hc-ac" type="number" value="25" step="0.5"><span>%</span></div>
+          <div class="calc-row"><label>Tail Vol. Coeff. V̄ₜ</label><input id="hc-vt" type="number" value="0.95" step="0.01"><span>—</span></div>
+          <div class="calc-row"><label>dε/dα (downwash slope)</label><input id="hc-de" type="number" value="0.38" step="0.01"><span>—</span></div>
+          <button class="calc-btn" onclick="calcHstab()">COMPUTE</button>
+          <div class="calc-result" id="hs-result">Press COMPUTE</div>
+        </div>`
+    }
+  },
+
+  gear:{
+    label:'UNDERCARRIAGE · GROUND SYSTEMS', title:'Landing Gear System', color:'c3',
+    tabs:{
+      overview:`
+        <div class="section-label">Gear Configuration</div>
+        <p class="eng">The 737 uses a <strong>tricycle configuration</strong>: one twin-wheel nose gear and two four-wheel main bogies. High-strength 300M steel (ultimate strength ~1,930 MPa) absorbs landing loads. The gear retracts hydraulically into bays (nose gear forward, main gear inward) — doors close to restore aerodynamic profile.</p>
+        <p class="eng">Tyres are inflated to <strong>200 PSI</strong> (13.8 bar) and rated for 0→270 km/h spin-up in under 1 second. Anti-skid braking systems (similar to automotive ABS) prevent tyre burst and maximise deceleration.</p>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-l">WHEELS</div><div class="stat-v">10 total</div></div>
+          <div class="stat-card"><div class="stat-l">TYRE PRESSURE</div><div class="stat-v">200 PSI</div></div>
+          <div class="stat-card"><div class="stat-l">RETRACT TIME</div><div class="stat-v">~8 sec</div></div>
+          <div class="stat-card"><div class="stat-l">MAX LAND WEIGHT</div><div class="stat-v">66,360 kg</div></div>
+        </div>`,
+      physics:`
+        <div class="section-label">Landing Impact Energy</div>
+        <p class="eng">At touchdown, the oleo-pneumatic shock absorber (oleo strut) must absorb the aircraft's kinetic energy in the vertical direction. It works by forcing hydraulic fluid through an orifice — converting kinetic energy to heat — while nitrogen gas provides the spring return force.</p>
+        <div class="eq-box"><span class="eq-label">SINK RATE ENERGY</span>$$E = \\frac{1}{2}mV_s^2$$</div>
+        <div class="eq-box"><span class="eq-label">OLEO WORK OUTPUT</span>$$W_{oleo} = F_{avg} \\cdot s = \\eta_{oleo}\\, P_{max}\\, S_{stroke}$$</div>
+        <p class="eng">At max landing weight 66,360 kg and certification sink rate 3.05 m/s (600 ft/min):</p>
+        <div class="deriv-step"><div class="step-num">1.</div><div class="step-body">$E = \\frac{1}{2}\\times 66360 \\times 3.05^2 = 308{,}724$ J = 308.7 kJ</div></div>
+        <div class="deriv-step"><div class="step-num">2.</div><div class="step-body">Two main struts, stroke ~0.45 m, efficiency ~0.85: $F_{avg} = 308724/(2 \\times 0.85 \\times 0.45) = 403{,}820$ N = 404 kN per strut</div></div>
+        <div class="deriv-step"><div class="step-num">3.</div><div class="step-body">Load factor at touchdown: $n = F_{gear}/W = (2\\times 404000)/(66360\\times 9.81) = 1.24g$</div></div>`,
+      math:`
+        <div class="section-label">Braking & Stopping Distance</div>
+        <div class="eq-box"><span class="eq-label">DECELERATION WITH BRAKING & THRUST REVERSERS</span>$$a = g(\\mu_b + \\frac{D + T_{rev}}{W} - \\frac{L}{W})$$</div>
+        <div class="eq-box"><span class="eq-label">STOPPING DISTANCE FROM SPEED V</span>$$s = \\frac{V^2}{2a} = \\frac{V^2}{2g(\\mu_b + (D+T_{rev}-L)/W)}$$</div>
+        <div class="eq-box"><span class="eq-label">ANTI-SKID — SLIP RATIO</span>$$\\lambda = \\frac{V - \\omega r}{V} \\ , \\quad \\mu_{max}\\text{ occurs at }\\lambda \\approx 0.15$$</div>
+        <p class="eng">The anti-skid controller modulates brake pressure to maintain $\\lambda \\approx 0.15$ (peak friction coefficient). At $\\lambda = 0$ (free rolling) $\\mu \\approx 0$; at $\\lambda = 1$ (locked wheel) $\\mu \\approx 0.4$ but tyre skids — far below peak $\\mu \\approx 0.7$.</p>`,
+      calc:`
+        <div class="calc-title">⚙ Landing Energy & Load Factor</div>
+        <div class="calc-box">
+          <div class="calc-row"><label>Landing weight (kg)</label><input id="gc-w" type="number" value="66360" step="100"><span>kg</span></div>
+          <div class="calc-row"><label>Sink rate (m/s)</label><input id="gc-vs" type="number" value="3.05" step="0.1"><span>m/s</span></div>
+          <div class="calc-row"><label>Strut stroke (m)</label><input id="gc-st" type="number" value="0.45" step="0.01"><span>m</span></div>
+          <div class="calc-row"><label>Oleo efficiency η</label><input id="gc-e" type="number" value="0.85" step="0.01"><span>—</span></div>
+          <button class="calc-btn" onclick="calcGear()">COMPUTE</button>
+          <div class="calc-result" id="gear-result">Press COMPUTE</div>
+        </div>`
+    }
+  },
+
+  apu:{
+    label:'AUXILIARY SYSTEMS · POWER', title:'Auxiliary Power Unit (APU)', color:'c4',
+    tabs:{
+      overview:`
+        <div class="section-label">APU Function</div>
+        <p class="eng">The APU is a small <strong>Honeywell HGT750 gas turbine</strong> in the tail cone. It provides two services: <strong>bleed air</strong> (for cabin conditioning and main engine starting) and <strong>electrical power</strong> (90 kVA from an integrated generator). It operates from ground level to ~FL250 as an emergency electrical source.</p>
+        <p class="eng">The APU burns approximately 100–200 kg of fuel per hour — vastly less than the main engines (2,500 kg/hr each at TO). Airlines typically switch to Ground Power Units (GPU) within 3 minutes of gate arrival to reduce APU hours and maintenance costs.</p>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-l">MANUFACTURER</div><div class="stat-v">Honeywell HGT750</div></div>
+          <div class="stat-card"><div class="stat-l">ELECTRICAL OUTPUT</div><div class="stat-v">90 kVA, 115V AC</div></div>
+          <div class="stat-card"><div class="stat-l">BLEED AIR FLOW</div><div class="stat-v">~1.5 kg/s</div></div>
+          <div class="stat-card"><div class="stat-l">FUEL BURN</div><div class="stat-v">~130 kg/hr</div></div>
+        </div>`,
+      physics:`
+        <div class="section-label">APU Thermodynamic Cycle</div>
+        <p class="eng">The APU operates on an open-cycle Brayton process. Unlike main engines, most of the turbine work is absorbed by the compressor and generator — little energy remains for thrust. Bleed air is extracted after the compressor at ~200°C, 35 PSI, then cooled and used for conditioning.</p>
+        <div class="eq-box"><span class="eq-label">POWER BALANCE</div>$$P_{turbine} = P_{compressor} + P_{generator} + P_{losses}$$</div>
+        <div class="eq-box"><span class="eq-label">ELECTRICAL POWER GENERATION</span>$$P_{elec} = 3 V_{ph} I_{ph} \\cos\\phi \\ \\text{(3-phase AC)}$$</div>
+        <p class="eng">At 90 kVA, 115V (line-to-neutral), $\\cos\\phi = 0.95$: $I = 90000/(3 \\times 115 \\times 0.95) = 275$ A per phase. The generator must maintain exactly <strong>400 Hz</strong> frequency — requiring precise APU speed control (Constant Speed Drive).</p>`,
+      math:`
+        <div class="section-label">Aircraft Electrical System</div>
+        <div class="eq-box"><span class="eq-label">THREE-PHASE APPARENT POWER</span>$$S = \\sqrt{3}\\, V_L I_L = 3 V_{ph} I_{ph} \\ \\text{(VA)}$$</div>
+        <div class="eq-box"><span class="eq-label">REAL POWER</span>$$P = S\\cos\\phi \\ \\text{(W)} \\ , \\quad Q = S\\sin\\phi \\ \\text{(VAR)}$$</div>
+        <div class="eq-box"><span class="eq-label">FREQUENCY REGULATION</span>$$f = \\frac{N_{APU}\\cdot p}{60} = 400 \\ \\text{Hz} \\ \\Rightarrow \\ N_{APU} = \\frac{400\\times 60}{p}$$</div>
+        <p class="eng">where $p$ is the number of pole pairs. For a 2-pole generator: $N_{APU} = 24{,}000$ RPM. The FADEC (Full Authority Digital Engine Control) governing the APU maintains this speed within ±0.25%.</p>
+        <div class="note"><div class="note-lbl">Emergency Use</div><div class="note-txt">If both main generators fail in flight, the APU generator can power all essential avionics, hydraulic pumps, and lighting. A Ram Air Turbine (RAT) provides backup hydraulic/electrical power if even the APU fails.</div></div>`,
+      calc:`
+        <div class="calc-title">⚙ APU Power & Current Calculator</div>
+        <div class="calc-box">
+          <div class="calc-row"><label>Apparent power S (kVA)</label><input id="ap-s" type="number" value="90" step="1"><span>kVA</span></div>
+          <div class="calc-row"><label>Phase voltage Vph (V)</label><input id="ap-v" type="number" value="115" step="1"><span>V</span></div>
+          <div class="calc-row"><label>Power factor cos φ</label><input id="ap-pf" type="number" value="0.95" step="0.01" min="0.5" max="1"><span>—</span></div>
+          <div class="calc-row"><label>Fuel flow (kg/hr)</label><input id="ap-ff" type="number" value="130" step="5"><span>kg/hr</span></div>
+          <button class="calc-btn" onclick="calcApu()">COMPUTE</button>
+          <div class="calc-result" id="apu-result">Press COMPUTE</div>
+        </div>`
+    }
+  }
+};
+
+/* ═══════════════════════════════════════════════════
+   BUILD SIDEBAR
+═══════════════════════════════════════════════════ */
+const COLORS = {c1:'',c2:'c2',c3:'c3',c4:'c4'};
+const sidebar = document.getElementById('parts-sidebar');
+Object.entries(PARTS).forEach(([key,d])=>{
+  const div=document.createElement('div');
+  div.className='part-item'; div.id='pi-'+key;
+  div.onclick=()=>showInfo(key);
+  div.innerHTML=`<div class="pdot ${COLORS[d.color]||''}"></div><span class="pname">${d.title}</span>`;
+  sidebar.appendChild(div);
+});
+
+/* ═══════════════════════════════════════════════════
+   SHOW INFO
+═══════════════════════════════════════════════════ */
+let currentPart=null, currentTab='overview';
+
+function showInfo(key){
+  const d=PARTS[key]; if(!d)return;
+  currentPart=key;
+
+  document.getElementById('ph-tag').textContent=d.label;
+  const pt=document.getElementById('ph-title');
+  pt.textContent=d.title;
+  pt.className='ph-title '+(d.color==='c2'?'c2':d.color==='c3'?'c3':d.color==='c4'?'c4':'');
+
+  // Fill tabs
+  ['overview','physics','math','calc'].forEach(t=>{
+    document.getElementById('tab-'+t).innerHTML = d.tabs[t]||'<p class="eng" style="padding:14px 20px">Content coming soon.</p>';
+  });
+
+  switchTab('overview');
+  document.getElementById('info-panel').classList.add('visible');
+  document.getElementById('drag-hint').style.opacity='0';
+
+  // Sidebar highlight
+  document.querySelectorAll('.part-item').forEach(el=>el.classList.remove('active'));
+  const pi=document.getElementById('pi-'+key);
+  if(pi)pi.classList.add('active');
+
+  // Progress bar
+  const keys=Object.keys(PARTS);
+  const pct=Math.round((keys.indexOf(key)+1)/keys.length*100);
+  document.getElementById('bot-fill').style.width=pct+'%';
+
+  // Typeset MathJax
+  if(window.MathJax) MathJax.typesetPromise([document.getElementById('info-panel')]);
+}
+
+function switchTab(tab){
+  currentTab=tab;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+  document.getElementById('tab-'+tab).classList.add('active');
+  // find button
+  const btns=document.querySelectorAll('.tab-btn');
+  const tabs=['overview','physics','math','calc'];
+  btns[tabs.indexOf(tab)].classList.add('active');
+  if(window.MathJax) MathJax.typesetPromise([document.getElementById('tab-'+tab)]);
+}
+
+function closePanel(){
+  document.getElementById('info-panel').classList.remove('visible');
+  document.querySelectorAll('.part-item').forEach(el=>el.classList.remove('active'));
+}
+
+// Hotspots
+document.querySelectorAll('.hotspot').forEach(hs=>{
+  hs.addEventListener('click',e=>{e.stopPropagation();showInfo(hs.dataset.part);});
+  hs.addEventListener('mouseenter',()=>{const t=document.getElementById('tooltip');t.textContent=hs.title;t.style.opacity='1';});
+  hs.addEventListener('mouseleave',()=>{document.getElementById('tooltip').style.opacity='0';});
+  hs.addEventListener('mousemove',e=>{const t=document.getElementById('tooltip');t.style.left=e.clientX+14+'px';t.style.top=e.clientY-8+'px';});
+});
+
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#info-panel')&&!e.target.closest('.hotspot')&&!e.target.closest('#parts-sidebar')&&!e.target.closest('.header'))closePanel();
+});
+
+/* ═══════════════════════════════════════════════════
+   MODES
+═══════════════════════════════════════════════════ */
+function setMode(m){
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('btn-'+m).classList.add('active');
+  if(m==='derive'){ showInfo('wing'); switchTab('math'); }
+  else if(m==='calc'){ showInfo('engine'); switchTab('calc'); }
+}
+
+/* ═══════════════════════════════════════════════════
+   CALCULATORS
+═══════════════════════════════════════════════════ */
+function altPress(ft){ return 101325*Math.pow(1-0.0000225577*ft*0.3048,5.25588); }
+function altDens(ft){ return 1.225*Math.pow(1-0.0000225577*ft*0.3048,4.25588); }
+function altTemp(ft){ return 288.15-0.0065*ft*0.3048; }
+
+function calcNose(){
+  const M=parseFloat(document.getElementById('c-mach').value);
+  const alt=parseFloat(document.getElementById('c-alt').value);
+  const g=1.4;
+  const p=altPress(alt);
+  const T=altTemp(alt);
+  const a=Math.sqrt(g*287*T);
+  const TAS=M*a;
+  const p0=p*Math.pow(1+(g-1)/2*M*M,g/(g-1));
+  const q=p0-p;
+  const Cp=2/(g*M*M)*(Math.pow(1+(g-1)/2*M*M,g/(g-1))-1);
+  const dT=T*(g-1)/2*M*M;
+  document.getElementById('nose-result').innerHTML=
+    `p∞ = ${p.toFixed(0)} Pa | p₀ = ${p0.toFixed(0)} Pa | q = ${q.toFixed(0)} Pa<br>`+
+    `TAS = ${(TAS*1.944).toFixed(1)} kt | Cp,stag = ${Cp.toFixed(3)} | ΔT = +${dT.toFixed(1)} K`;
+}
+
+function calcCockpit(){
+  const IAS=parseFloat(document.getElementById('cc-ias').value)*0.5144;
+  const alt=parseFloat(document.getElementById('cc-alt').value);
+  const oat=parseFloat(document.getElementById('cc-oat').value)+273.15;
+  const rho=altDens(alt), rhoSL=1.225;
+  const TAS=IAS*Math.sqrt(rhoSL/rho);
+  const a=Math.sqrt(1.4*287*oat);
+  const M=TAS/a;
+  document.getElementById('cockpit-result').innerHTML=
+    `TAS = ${(TAS/0.5144).toFixed(1)} kt (${TAS.toFixed(1)} m/s)<br>`+
+    `Mach = ${M.toFixed(4)} | ρ = ${rho.toFixed(4)} kg/m³`;
+}
+
+function calcFuselage(){
+  const hCabin=parseFloat(document.getElementById('fc-cabin').value);
+  const hFlight=parseFloat(document.getElementById('fc-flight').value);
+  const r=parseFloat(document.getElementById('fc-r').value);
+  const t=parseFloat(document.getElementById('fc-t').value)/1000;
+  const pCabin=altPress(hCabin), pFlight=altPress(hFlight);
+  const dP=pCabin-pFlight;
+  const hoop=dP*r/t/1e6;
+  const long=dP*r/(2*t)/1e6;
+  const yield345=345;
+  const vm=Math.sqrt(hoop*hoop-hoop*long+long*long);
+  const SF=(yield345/hoop).toFixed(1);
+  document.getElementById('fuse-result').innerHTML=
+    `ΔP = ${(dP/1000).toFixed(2)} kPa (${(dP/6894.76).toFixed(2)} PSI)<br>`+
+    `Hoop σθ = ${hoop.toFixed(1)} MPa | Long σL = ${long.toFixed(1)} MPa<br>`+
+    `Von Mises = ${vm.toFixed(1)} MPa | Safety Factor = ${SF}×`;
+}
+
+function calcWindows(){
+  const s0=parseFloat(document.getElementById('wc-s').value);
+  const a=parseFloat(document.getElementById('wc-a').value);
+  const b=parseFloat(document.getElementById('wc-b').value);
+  const Kt=1+2*a/b;
+  const peak=Kt*s0;
+  document.getElementById('win-result').innerHTML=
+    `Kt = ${Kt.toFixed(3)} | Peak σ = ${peak.toFixed(1)} MPa<br>`+
+    `Acrylic strength ~70 MPa → SF = ${(70/peak).toFixed(2)}×`;
+}
+
+function calcWing(){
+  const W=parseFloat(document.getElementById('wg-w').value)*9.81;
+  const V=parseFloat(document.getElementById('wg-v').value);
+  const alt=parseFloat(document.getElementById('wg-a').value);
+  const S=parseFloat(document.getElementById('wg-s').value);
+  const AR=parseFloat(document.getElementById('wg-ar').value);
+  const rho=altDens(alt);
+  const q=0.5*rho*V*V;
+  const CL=W/(q*S);
+  const e=1.78*(1-0.045*Math.pow(AR,0.68))-0.64;
+  const CDi=CL*CL/(Math.PI*e*AR);
+  const Di=CDi*q*S;
+  document.getElementById('wing-result').innerHTML=
+    `q = ${q.toFixed(1)} Pa | CL = ${CL.toFixed(4)}<br>`+
+    `Oswald e = ${e.toFixed(3)} | CDi = ${CDi.toFixed(5)}<br>`+
+    `Induced Drag Di = ${(Di/1000).toFixed(2)} kN per wing`;
+}
+
+function calcWinglet(){
+  const b=parseFloat(document.getElementById('wl-b').value);
+  const h=parseFloat(document.getElementById('wl-h').value);
+  const d=parseFloat(document.getElementById('wl-d').value)*Math.PI/180;
+  const eta=parseFloat(document.getElementById('wl-e').value);
+  const k=eta*Math.cos(d);
+  const ratio=2*(h/b)*k*(2-(h/b)*k);
+  const effSpan=b+2*h*eta;
+  document.getElementById('wl-result').innerHTML=
+    `Κ (efficiency×cant) = ${k.toFixed(4)}<br>`+
+    `Oswald e improvement = ${(ratio*100).toFixed(2)}%<br>`+
+    `CDi reduction ≈ ${(ratio*100).toFixed(2)}% | Effective span ≈ ${effSpan.toFixed(2)} m<br>`+
+    `Approx. fuel saving ≈ ${(ratio*100*0.5).toFixed(2)}%`;
+}
+
+function calcEngine(){
+  const rp=parseFloat(document.getElementById('ec-rp').value);
+  const nc=parseFloat(document.getElementById('ec-nc').value);
+  const nt=parseFloat(document.getElementById('ec-nt').value);
+  const T1=parseFloat(document.getElementById('ec-t1').value);
+  const T3=parseFloat(document.getElementById('ec-t3').value);
+  const g=1.4, cp=1005;
+  const idealEff=1-1/Math.pow(rp,(g-1)/g);
+  const T2i=T1*Math.pow(rp,(g-1)/g);
+  const T2r=T1+(T2i-T1)/nc;
+  const T4i=T3/Math.pow(rp,(g-1)/g);
+  const wNet=cp*(T3-T4i)*nt-cp*(T2r-T1);
+  const qIn=cp*(T3-T2r);
+  const realEff=wNet/qIn;
+  document.getElementById('eng-result').innerHTML=
+    `Ideal Brayton η = ${(idealEff*100).toFixed(1)}%<br>`+
+    `T2 (real) = ${T2r.toFixed(1)} K | Net work = ${(wNet/1000).toFixed(1)} kJ/kg<br>`+
+    `Real cycle η ≈ ${(realEff*100).toFixed(1)}% | qIn = ${(qIn/1000).toFixed(1)} kJ/kg`;
+}
+
+function calcAileron(){
+  const W=parseFloat(document.getElementById('ac-w').value)*9.81;
+  const S=parseFloat(document.getElementById('ac-s').value);
+  const CLclean=parseFloat(document.getElementById('ac-cll').value);
+  const CLflap=parseFloat(document.getElementById('ac-clf').value);
+  const alt=parseFloat(document.getElementById('ac-a').value);
+  const rho=altDens(alt);
+  const Vs_clean=Math.sqrt(2*W/(rho*S*CLclean));
+  const Vs_flap=Math.sqrt(2*W/(rho*S*CLflap));
+  document.getElementById('ail-result').innerHTML=
+    `Clean Stall = ${(Vs_clean/0.5144).toFixed(1)} kt (${Vs_clean.toFixed(1)} m/s)<br>`+
+    `Flap Stall = ${(Vs_flap/0.5144).toFixed(1)} kt (${Vs_flap.toFixed(1)} m/s)<br>`+
+    `ΔCLmax = +${(CLflap-CLclean).toFixed(2)} | Speed reduction = ${((1-Vs_flap/Vs_clean)*100).toFixed(1)}%`;
+}
+
+function calcTail(){
+  const T=parseFloat(document.getElementById('tc-t').value)*1000;
+  const y=parseFloat(document.getElementById('tc-y').value);
+  const Sv=parseFloat(document.getElementById('tc-sv').value);
+  const lv=parseFloat(document.getElementById('tc-lv').value);
+  const V=parseFloat(document.getElementById('tc-v').value)*0.5144;
+  const rho=1.225;
+  const N_eng=T*y;
+  const q=0.5*rho*V*V;
+  const CNd=0.02; const dr=27*Math.PI/180;
+  const N_rud=q*Sv*lv*CNd*dr;
+  const margin=(N_rud/N_eng-1)*100;
+  document.getElementById('tail-result').innerHTML=
+    `Engine yaw moment = ${(N_eng/1000).toFixed(1)} kN·m<br>`+
+    `Rudder moment (max δr=27°) = ${(N_rud/1000).toFixed(1)} kN·m<br>`+
+    `Margin = ${margin.toFixed(1)}% ${margin>0?'✅ Sufficient':'❌ Insufficient'}`;
+}
+
+function calcHstab(){
+  const cg=parseFloat(document.getElementById('hc-cg').value)/100;
+  const ac=parseFloat(document.getElementById('hc-ac').value)/100;
+  const Vt=parseFloat(document.getElementById('hc-vt').value);
+  const de=parseFloat(document.getElementById('hc-de').value);
+  const a1=2*Math.PI; const at=2*Math.PI*0.9;
+  const NP_pct=(ac*a1+Vt*at*(1-de))/(a1+Vt*at*(1-de));
+  const SM=(NP_pct-cg)*100;
+  document.getElementById('hs-result').innerHTML=
+    `Neutral Point ≈ ${(NP_pct*100).toFixed(1)}% MAC<br>`+
+    `Static Margin = ${SM.toFixed(1)}% MAC<br>`+
+    `Stability: ${SM>0?'✅ STABLE (restoring)':'⚠️ UNSTABLE (augmentation needed)'}`;
+}
+
+function calcGear(){
+  const W=parseFloat(document.getElementById('gc-w').value);
+  const Vs=parseFloat(document.getElementById('gc-vs').value);
+  const s=parseFloat(document.getElementById('gc-st').value);
+  const eta=parseFloat(document.getElementById('gc-e').value);
+  const E=0.5*W*Vs*Vs;
+  const Favg=E/(2*eta*s);
+  const n=Favg*2/(W*9.81);
+  document.getElementById('gear-result').innerHTML=
+    `KE = ${(E/1000).toFixed(1)} kJ total<br>`+
+    `Average strut force = ${(Favg/1000).toFixed(1)} kN per strut<br>`+
+    `Touchdown load factor = ${n.toFixed(2)}g`;
+}
+
+function calcApu(){
+  const S=parseFloat(document.getElementById('ap-s').value)*1000;
+  const Vph=parseFloat(document.getElementById('ap-v').value);
+  const pf=parseFloat(document.getElementById('ap-pf').value);
+  const ff=parseFloat(document.getElementById('ap-ff').value);
+  const I=S/(3*Vph);
+  const P=S*pf/1000;
+  const eff=P/(ff/3.6*43200/1000)*100;
+  document.getElementById('apu-result').innerHTML=
+    `Phase current Iph = ${I.toFixed(1)} A<br>`+
+    `Real power P = ${P.toFixed(1)} kW | Reactive Q = ${(S/1000*Math.sqrt(1-pf*pf)).toFixed(1)} kVAR<br>`+
+    `Electrical efficiency ≈ ${eff.toFixed(1)}% (fuel→elec)`;
+}
+
+/* ═══════════════════════════════════════════════════
+   SPEED RING SVG
+═══════════════════════════════════════════════════ */
+(function(){
+  const sr=document.getElementById('speed-ring');
+  const ns='http://www.w3.org/2000/svg';
+  const svg=document.createElementNS(ns,'svg'); svg.setAttribute('viewBox','0 0 60 60');
+  const bg=document.createElementNS(ns,'circle'); bg.setAttribute('cx','30');bg.setAttribute('cy','30');bg.setAttribute('r','24');bg.setAttribute('fill','none');bg.setAttribute('stroke','rgba(0,212,255,0.1)');bg.setAttribute('stroke-width','3');
+  const arc=document.createElementNS(ns,'circle'); arc.setAttribute('cx','30');arc.setAttribute('cy','30');arc.setAttribute('r','24');arc.setAttribute('fill','none');arc.setAttribute('stroke','#00d4ff');arc.setAttribute('stroke-width','2');arc.setAttribute('stroke-dasharray','150.8');arc.setAttribute('stroke-dashoffset','38');arc.setAttribute('stroke-linecap','round');arc.setAttribute('transform','rotate(-90 30 30)');
+  const txt=document.createElementNS(ns,'text');txt.setAttribute('x','30');txt.setAttribute('y','28');txt.setAttribute('text-anchor','middle');txt.setAttribute('fill','#00d4ff');txt.setAttribute('font-size','8');txt.setAttribute('font-family','Orbitron');txt.textContent='485';
+  const sub=document.createElementNS(ns,'text');sub.setAttribute('x','30');sub.setAttribute('y','37');sub.setAttribute('text-anchor','middle');sub.setAttribute('fill','#3a6a88');sub.setAttribute('font-size','5');sub.setAttribute('font-family','Share Tech Mono');sub.textContent='KTS';
+  svg.appendChild(bg);svg.appendChild(arc);svg.appendChild(txt);svg.appendChild(sub);
+  sr.appendChild(svg);
+  setInterval(()=>{txt.textContent=483+Math.round(Math.random()*4);},3000);
+})();
+</script>
+</body>
+</html>
