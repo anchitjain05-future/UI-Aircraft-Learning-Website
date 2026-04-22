@@ -1,0 +1,3199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script>
+    window.onerror = function(message, source, lineno, colno, error) {
+        var errDiv = document.createElement('div');
+        errDiv.style.cssText = 'color:red; background:white; position:fixed; z-index:9999; top:0; left:0; width:100%; padding:20px; font-size:20px; border-bottom: 2px solid black; font-family: monospace;';
+        errDiv.innerHTML = '<b>JS ERROR:</b> ' + message + '<br>Line: ' + lineno;
+        document.body.appendChild(errDiv);
+        return false;
+    };
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Understanding the Airplane</title>
+    <meta name="description" content="An interactive, beginner-friendly course to understand the physics and mechanics of airplanes.">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+:root {
+    --bg-dark: #0a192f;
+    --bg-darker: #020c1b;
+    --bg-card: #112240;
+    --text-main: #ccd6f6;
+    --text-muted: #8892b0;
+    --accent: #64ffda;
+    --accent-hover: #52e0c4;
+    --highlight: #ffb86c;
+    --correct: #50fa7b;
+    --incorrect: #ff5555;
+    
+    --font-heading: 'Outfit', sans-serif;
+    --font-body: 'Inter', sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: var(--font-body);
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    line-height: 1.6;
+    font-size: 18px; /* Big and visible */
+    overflow-x: hidden;
+}
+
+h1, h2, h3, h4 {
+    font-family: var(--font-heading);
+    color: #e6f1ff;
+    margin-bottom: 1rem;
+}
+
+#app {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+    background-color: var(--bg-dark); /* Solid background to cover sky */
+    position: relative;
+    z-index: 10;
+}
+
+/* Sidebar */
+#sidebar {
+    width: 300px;
+    background-color: var(--bg-darker);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    transition: transform 0.3s ease;
+}
+
+.sidebar-header {
+    padding: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    transition: background 0.3s ease;
+}
+.sidebar-header:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.sidebar-header .logo-icon {
+    color: var(--accent);
+    width: 32px;
+    height: 32px;
+}
+
+.sidebar-header h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    letter-spacing: 1px;
+}
+
+#nav-menu {
+    padding: 1.5rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.nav-item {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    text-align: left;
+    padding: 0.8rem 2rem;
+    font-size: 1rem;
+    font-family: var(--font-heading);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-left: 3px solid transparent;
+}
+
+.nav-item:hover {
+    color: var(--text-main);
+    background-color: rgba(100, 255, 218, 0.05);
+}
+
+.nav-item.active {
+    color: var(--accent);
+    border-left-color: var(--accent);
+    background-color: rgba(100, 255, 218, 0.1);
+    font-weight: 600;
+}
+
+/* Main Content */
+#main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    scroll-behavior: smooth;
+}
+
+.mobile-header {
+    display: none;
+    padding: 1rem;
+    background-color: var(--bg-darker);
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.content-wrapper {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 3rem 2rem;
+    width: 100%;
+    animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Video Player Simulation */
+.video-container {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background-color: #000;
+    border-radius: 12px;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 2rem;
+    box-shadow: 0 10px 30px -15px rgba(0, 0, 0, 0.7);
+    cursor: pointer;
+    border: 2px solid rgba(100, 255, 218, 0.2);
+}
+
+.video-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.7;
+    transition: opacity 0.3s;
+}
+
+.video-container:hover img {
+    opacity: 0.5;
+}
+
+.play-button {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80px;
+    height: 80px;
+    background-color: rgba(10, 25, 47, 0.8);
+    border: 2px solid var(--accent);
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--accent);
+    transition: all 0.3s ease;
+}
+
+.video-container:hover .play-button {
+    transform: translate(-50%, -50%) scale(1.1);
+    background-color: var(--accent);
+    color: var(--bg-dark);
+}
+
+.video-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    padding: 1rem;
+    background: linear-gradient(transparent, rgba(0,0,0,0.8));
+    color: white;
+    font-family: var(--font-heading);
+    font-size: 1.2rem;
+}
+
+/* Tabs */
+.tabs-container {
+    margin-top: 2rem;
+    background-color: var(--bg-card);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px -15px rgba(0, 0, 0, 0.7);
+}
+
+.tabs-header {
+    display: flex;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background-color: var(--bg-darker);
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 1.2rem;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    font-family: var(--font-heading);
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.tab-btn:hover {
+    color: var(--text-main);
+    background-color: rgba(255,255,255,0.02);
+}
+
+.tab-btn.active {
+    color: var(--accent);
+    background-color: var(--bg-card);
+    border-bottom: 3px solid var(--accent);
+    font-weight: 600;
+}
+
+.tab-content {
+    padding: 2.5rem;
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+    animation: fadeIn 0.4s ease-out;
+}
+
+/* Text Content Styles */
+.textual-content h2 {
+    color: var(--accent);
+    font-size: 2.2rem;
+    margin-bottom: 1.5rem;
+}
+
+.textual-content h3 {
+    color: var(--text-main);
+    margin-top: 2rem;
+    font-size: 1.5rem;
+}
+
+.textual-content p {
+    margin-bottom: 1.5rem;
+}
+
+.textual-content ul {
+    margin-left: 2rem;
+    margin-bottom: 1.5rem;
+}
+
+.textual-content li {
+    margin-bottom: 0.5rem;
+}
+
+/* Physics Terms */
+.physics-term {
+    color: var(--highlight);
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 1px dashed var(--highlight);
+    position: relative;
+    padding: 0 2px;
+    transition: all 0.2s;
+}
+
+.physics-term:hover {
+    background-color: rgba(255, 184, 108, 0.1);
+}
+
+/* Tooltip */
+.tooltip {
+    position: absolute;
+    background-color: var(--bg-card);
+    border: 1px solid var(--highlight);
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    max-width: 300px;
+    z-index: 1000;
+    opacity: 1;
+    transition: opacity 0.2s;
+}
+
+.tooltip.hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.tooltip h4 {
+    color: var(--highlight);
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+}
+
+.tooltip p {
+    font-size: 0.9rem;
+    margin: 0;
+    line-height: 1.4;
+}
+
+/* Quiz Styles */
+.quiz-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.question-block {
+    margin-bottom: 2.5rem;
+    padding: 2rem;
+    background-color: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.question-text {
+    font-size: 1.3rem;
+    font-family: var(--font-heading);
+    margin-bottom: 1.5rem;
+    color: #fff;
+}
+
+.options-grid {
+    display: grid;
+    gap: 1rem;
+}
+
+.option-btn {
+    background-color: var(--bg-darker);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-main);
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    text-align: left;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.option-btn:hover:not(:disabled) {
+    border-color: var(--accent);
+    background-color: rgba(100, 255, 218, 0.05);
+}
+
+.option-btn.selected {
+    border-color: var(--accent);
+    background-color: rgba(100, 255, 218, 0.1);
+}
+
+.option-btn.correct {
+    border-color: var(--correct);
+    background-color: rgba(80, 250, 123, 0.1);
+    color: var(--correct);
+}
+
+.option-btn.wrong {
+    border-color: var(--incorrect);
+    background-color: rgba(255, 85, 85, 0.1);
+    color: var(--incorrect);
+}
+
+.explanation-box {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    border-radius: 8px;
+    background-color: rgba(100, 255, 218, 0.05);
+    border-left: 4px solid var(--accent);
+    display: none;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.explanation-box.show {
+    display: block;
+}
+
+.explanation-box h4 {
+    color: var(--accent);
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.quiz-results {
+    text-align: center;
+    padding: 3rem;
+    background-color: var(--bg-card);
+    border-radius: 12px;
+    margin-top: 2rem;
+    display: none;
+}
+
+.quiz-results h2 {
+    color: var(--accent);
+    font-size: 2.5rem;
+}
+
+.quiz-results p {
+    font-size: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.restart-btn {
+    background-color: var(--accent);
+    color: var(--bg-dark);
+    border: none;
+    padding: 1rem 2rem;
+    font-size: 1.2rem;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    font-family: var(--font-heading);
+}
+
+.restart-btn:hover {
+    background-color: var(--accent-hover);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    #app {
+        flex-direction: column;
+    }
+    
+    #sidebar {
+        position: fixed;
+        left: -100%;
+        top: 0;
+        height: 100vh;
+        z-index: 2000;
+    }
+    
+    #sidebar.open {
+        left: 0;
+        box-shadow: 20px 0 50px rgba(0,0,0,0.5);
+    }
+    
+    .mobile-header {
+        display: flex;
+    }
+    
+    .mobile-header h2 {
+        margin: 0;
+        margin-left: 1rem;
+        color: var(--accent);
+    }
+    
+    #mobile-menu-btn {
+        background: none;
+        border: none;
+        color: var(--text-main);
+        cursor: pointer;
+    }
+}
+
+.animation-container {
+    width: 100%;
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid rgba(100, 255, 218, 0.2);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    margin-bottom: 2rem;
+}
+#sim-canvas {
+    width: 100%;
+    height: 400px;
+    display: block;
+}
+.sim-controls {
+    background: rgba(10, 25, 47, 0.9);
+    padding: 15px 20px;
+    border-top: 1px solid rgba(100, 255, 218, 0.2);
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    justify-content: center;
+}
+.sim-controls label {
+    color: var(--text-light);
+    font-weight: 500;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.sim-controls input[type="range"] {
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+.home-page {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: radial-gradient(circle at center, #112240 0%, #0a192f 100%);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+}
+.home-content {
+    text-align: center;
+    animation: fadeInUp 1s ease-out;
+}
+.home-logo {
+    width: 80px; height: 80px;
+    color: var(--accent);
+    margin-bottom: 1rem;
+    animation: float 3s ease-in-out infinite;
+}
+.home-title {
+    font-size: 5rem;
+    font-weight: 800;
+    color: var(--text-light);
+    margin-bottom: 0.5rem;
+    letter-spacing: -2px;
+}
+.home-subtitle {
+    font-size: 1.2rem;
+    color: var(--text-muted);
+    margin-bottom: 1rem;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+.home-features {
+    display: flex;
+    gap: 1.5rem;
+    margin-bottom: 3rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+.feature-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(100, 255, 218, 0.2);
+    padding: 0.8rem 1.5rem;
+    border-radius: 50px;
+    color: var(--text-light);
+    font-weight: 500;
+    font-size: 1rem;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+.feature-badge i {
+    color: var(--accent);
+    width: 20px;
+    height: 20px;
+}
+.feature-badge:hover {
+    transform: translateY(-5px);
+    border-color: var(--accent);
+    box-shadow: 0 8px 25px rgba(100, 255, 218, 0.2);
+    background: rgba(100, 255, 218, 0.05);
+}
+.start-btn {
+    background: var(--accent);
+    color: var(--bg-dark);
+    border: none;
+    padding: 1rem 3rem;
+    font-size: 1.2rem;
+    font-weight: 600;
+    border-radius: 50px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 10px 20px rgba(100, 255, 218, 0.3);
+}
+.start-btn:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 15px 25px rgba(100, 255, 218, 0.4);
+}
+.home-footer {
+    position: absolute;
+    bottom: 2rem;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    opacity: 0.7;
+    letter-spacing: 1px;
+}
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-10px); }
+    100% { transform: translateY(0px); }
+}
+
+@keyframes planeTakeoff {
+    0% { 
+        transform: translate(0, 0) scale(1) rotate(0deg); 
+        clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%);
+        opacity: 1; 
+    }
+    20% { 
+        transform: translate(0, 0) scale(0.7) rotate(0deg); 
+        clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%);
+        opacity: 1; 
+    }
+    50% { 
+        transform: translate(0, 0) scale(0.6) rotate(90deg); 
+        clip-path: polygon(50% 0%, 100% 100%, 50% 80%, 0% 100%);
+        opacity: 1; 
+    }
+    65% { 
+        transform: translate(-30px, 10px) scale(0.5) rotate(90deg); 
+        clip-path: polygon(50% 0%, 100% 100%, 50% 80%, 0% 100%);
+        opacity: 1; 
+    }
+    100% { 
+        transform: translate(150vw, -150vh) scale(0.2) rotate(90deg); 
+        clip-path: polygon(50% 0%, 100% 100%, 50% 80%, 0% 100%);
+        opacity: 0; 
+    }
+}
+.home-page.taking-off {
+    animation: planeTakeoff 2s cubic-bezier(0.5, 0, 0.2, 1) forwards;
+}
+
+
+/* --- HIDDEN NATIVE SCROLLBAR --- */
+*::-webkit-scrollbar {
+    display: none;
+}
+* {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+body, html {
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+}
+
+
+/* --- CUSTOM JS KEYCHAIN SCROLLBAR --- */
+.custom-track {
+    position: absolute;
+    top: 20px;
+    bottom: 20px;
+    width: 2px;
+    background: repeating-linear-gradient(to bottom, transparent, transparent 6px, rgba(100, 255, 218, 0.2) 6px, rgba(100, 255, 218, 0.2) 10px);
+    z-index: 9999;
+    pointer-events: none;
+}
+.custom-thumb {
+    position: absolute;
+    top: 0;
+    transform-origin: top center;
+    will-change: transform;
+    pointer-events: auto;
+    cursor: grab;
+    filter: drop-shadow(0 10px 15px rgba(0,0,0,0.5));
+}
+.custom-thumb:active { cursor: grabbing; }
+
+#custom-scrollbar-track { right: 15px; }
+#custom-keychain { left: -29px; width: 60px; height: 150px; }
+
+#sidebar-scrollbar-track { right: 2px; opacity: 0.6; }
+#sidebar-keychain { left: -14px; width: 30px; height: 75px; }
+
+
+/* --- SKY BACKGROUND --- */
+#sky-bg {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: linear-gradient(to bottom, #4facfe 0%, #00f2fe 100%);
+    z-index: -1;
+    overflow: hidden;
+}
+.cloud {
+    position: absolute;
+    background: white;
+    border-radius: 50px;
+    opacity: 0.8;
+    filter: drop-shadow(0 5px 15px rgba(0,0,0,0.1));
+}
+.cloud::before, .cloud::after {
+    content: '';
+    position: absolute;
+    background: white;
+    border-radius: 50%;
+}
+/* Cloud 1 */
+.cloud-1 { width: 150px; height: 50px; top: 20%; left: 10%; animation: floatCloud 20s linear infinite; }
+.cloud-1::before { width: 70px; height: 70px; top: -30px; left: 20px; }
+.cloud-1::after { width: 50px; height: 50px; top: -20px; right: 20px; }
+/* Cloud 2 */
+.cloud-2 { width: 200px; height: 60px; top: 40%; right: 15%; animation: floatCloud 25s linear infinite reverse; }
+.cloud-2::before { width: 90px; height: 90px; top: -40px; left: 30px; }
+.cloud-2::after { width: 70px; height: 70px; top: -30px; right: 30px; }
+/* Cloud 3 */
+.cloud-3 { width: 120px; height: 40px; top: 70%; left: 30%; animation: floatCloud 18s linear infinite; }
+.cloud-3::before { width: 50px; height: 50px; top: -25px; left: 15px; }
+.cloud-3::after { width: 40px; height: 40px; top: -15px; right: 15px; }
+
+@keyframes floatCloud {
+    0% { transform: translateX(0); }
+    50% { transform: translateX(30px); }
+    100% { transform: translateX(0); }
+}
+
+/* --- Parts of a Plane Overhaul --- */
+.parts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin: 1.5rem 0;
+}
+.part-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s ease, border-color 0.3s ease;
+}
+.part-card:hover {
+    transform: translateY(-5px);
+    border-color: var(--accent);
+    background: rgba(100, 255, 218, 0.05);
+}
+.sticker-icon {
+    position: absolute;
+    top: 1.2rem;
+    right: 1.2rem;
+    width: 32px;
+    height: 32px;
+    color: var(--accent);
+    opacity: 0.8;
+}
+.part-card h4 {
+    margin-top: 0;
+    font-size: 1.2rem;
+    color: var(--text-light);
+    margin-bottom: 0.8rem;
+    padding-right: 40px;
+}
+.part-card p {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--text-muted);
+}
+
+.modern-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5rem 0;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+.modern-table th, .modern-table td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.modern-table th {
+    background: rgba(100, 255, 218, 0.1);
+    color: var(--accent);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 1px;
+}
+.modern-table tr:hover td {
+    background: rgba(255, 255, 255, 0.04);
+}
+.modern-table td strong {
+    color: var(--text-main);
+}
+
+/* --- SCROLL TO TOP BUTTON --- */
+#scroll-to-top-btn {
+    position: fixed;
+    bottom: 40px;
+    right: 80px; /* Leaves room for the keychain scrollbar */
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background-color: var(--accent);
+    color: var(--bg-darker);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 4px 15px rgba(100, 255, 218, 0.4);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(20px);
+    transition: all 0.3s ease;
+    z-index: 1000;
+}
+#scroll-to-top-btn i {
+    width: 32px;
+    height: 32px;
+}
+#scroll-to-top-btn.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+#scroll-to-top-btn:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 8px 25px rgba(100, 255, 218, 0.6);
+    background-color: var(--accent-hover);
+}
+
+/* --- NEW QUIZ TYPES --- */
+.quiz-blank-input {
+    width: 100%;
+    padding: 1rem;
+    background: rgba(255,255,255,0.05);
+    border: 2px solid rgba(255,255,255,0.1);
+    border-radius: 8px;
+    color: var(--text-main);
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    font-family: inherit;
+    transition: all 0.3s;
+}
+.quiz-blank-input:focus {
+    border-color: var(--accent);
+    outline: none;
+}
+.quiz-blank-input.correct {
+    border-color: var(--correct);
+    background: rgba(80, 250, 123, 0.1);
+}
+.quiz-blank-input.wrong {
+    border-color: var(--incorrect);
+    background: rgba(255, 85, 85, 0.1);
+}
+.check-btn {
+    background: var(--accent);
+    color: var(--bg-darker);
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: 6px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.check-btn:hover:not(:disabled) {
+    background: var(--accent-hover);
+    transform: translateY(-2px);
+}
+.check-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+.match-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.8rem;
+    background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.05);
+    margin-bottom: 0.5rem;
+    border-radius: 6px;
+}
+.match-left {
+    font-weight: bold;
+    color: var(--text-light);
+    flex: 1;
+}
+.match-select {
+    flex: 1;
+    padding: 0.5rem;
+    background: var(--bg-dark);
+    color: var(--text-main);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 4px;
+}
+.match-select.correct { border-color: var(--correct); color: var(--correct); }
+.match-select.wrong { border-color: var(--incorrect); color: var(--incorrect); }
+
+/* --- QUIZ RESULTS & PERFECT SCORE ANIMATION --- */
+#quiz-results {
+    background: rgba(10, 25, 47, 0.8);
+    border: 2px solid rgba(100, 255, 218, 0.3);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+    text-align: center;
+    padding: 2.5rem;
+    border-radius: 12px;
+    margin-top: 2rem;
+    transition: all 0.5s ease;
+}
+#quiz-results.perfect-glow {
+    box-shadow: 0 0 40px rgba(100, 255, 218, 0.6);
+    border-color: #64ffda;
+    animation: pulseGlow 2s infinite alternate;
+}
+#quiz-results .final-score {
+    font-size: 2.2rem;
+    font-weight: bold;
+    color: var(--text-light);
+    margin: 1.5rem 0;
+}
+#advice-display {
+    font-size: 1.2rem;
+    font-weight: 500;
+    margin: 0;
+}
+@keyframes pulseGlow {
+    from { box-shadow: 0 0 20px rgba(100, 255, 218, 0.4); }
+    to { box-shadow: 0 0 50px rgba(100, 255, 218, 0.8); }
+}
+
+.flying-plane {
+    position: fixed;
+    bottom: -50px;
+    color: var(--accent);
+    width: 40px;
+    height: 40px;
+    z-index: 9999;
+    opacity: 0;
+    pointer-events: none;
+    animation: flyUpwards linear forwards;
+}
+
+@keyframes flyUpwards {
+    0% {
+        transform: translateY(0) rotate(-45deg) scale(0.5);
+        opacity: 0;
+    }
+    10% {
+        opacity: 1;
+    }
+    90% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(-120vh) rotate(-45deg) scale(1.5);
+        opacity: 0;
+    }
+}
+
+/* --- RICH CONTENT COMPONENTS --- */
+.content-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin: 2rem 0;
+}
+.glass-panel {
+    background: rgba(10, 25, 47, 0.6);
+    border: 1px solid rgba(100, 255, 218, 0.2);
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    backdrop-filter: blur(8px);
+    transition: transform 0.3s ease, border-color 0.3s ease;
+}
+.glass-panel:hover {
+    transform: translateY(-5px);
+    border-color: rgba(100, 255, 218, 0.6);
+}
+.glass-panel h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    color: var(--accent);
+    margin-top: 0;
+}
+.feature-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 2rem 0;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+.feature-table th {
+    background: rgba(100, 255, 218, 0.15);
+    color: var(--accent);
+    padding: 1rem;
+    text-align: left;
+    font-weight: bold;
+}
+.feature-table td {
+    padding: 1rem;
+    background: rgba(10, 25, 47, 0.4);
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.feature-table tr:last-child td { border-bottom: none; }
+.feature-table tr:hover td { background: rgba(10, 25, 47, 0.8); }
+.highlight-box {
+    background: linear-gradient(135deg, rgba(100, 255, 218, 0.1) 0%, rgba(10, 25, 47, 0) 100%);
+    border-left: 4px solid var(--accent);
+    padding: 1.5rem;
+    margin: 2rem 0;
+    border-radius: 0 8px 8px 0;
+}
+</style>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+<!-- MASSIVE UI OVERRIDE -->
+<style id="theme-override">
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;600;700&display=swap');
+
+:root {
+    --bg-dark: #030712 !important;
+    --bg-darker: rgba(3, 7, 18, 0.6) !important;
+    --bg-card: rgba(15, 23, 42, 0.4) !important;
+    --text-main: #f8fafc !important;
+    --text-muted: #94a3b8 !important;
+    --text-light: #ffffff !important;
+    --accent: #00f0ff !important;
+    --accent-hover: #38bdf8 !important;
+    --highlight: #f59e0b !important;
+    --font-heading: 'Space Grotesk', sans-serif !important;
+    --font-body: 'Space Grotesk', sans-serif !important;
+}
+
+body, html, * {
+    font-family: 'Space Grotesk', sans-serif !important;
+}
+
+#sky-bg {
+    display: none !important;
+}
+
+.home-page {
+    background: radial-gradient(circle at center, #0f172a 0%, #030712 100%) !important;
+}
+
+body {
+    background: radial-gradient(circle at center, #0f172a 0%, #030712 100%) !important;
+    background-color: #030712 !important;
+    color: #ffffff !important;
+}
+
+.home-title {
+    color: #ffffff !important;
+    text-shadow: 0 0 20px rgba(0, 240, 255, 0.4) !important;
+}
+
+.home-subtitle {
+    color: #94a3b8 !important;
+}
+
+.feature-badge {
+    background: rgba(15, 23, 42, 0.6) !important;
+    border: 1px solid rgba(0, 240, 255, 0.2) !important;
+    color: #ffffff !important;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3) !important;
+}
+
+.feature-badge i {
+    color: #00f0ff !important;
+}
+
+.start-btn {
+    background: #00f0ff !important;
+    color: #030712 !important;
+    font-weight: 700 !important;
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.4) !important;
+}
+
+/* Background Grid/Particles */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background-image: 
+        linear-gradient(rgba(0, 240, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 240, 255, 0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    z-index: -1;
+    pointer-events: none;
+}
+
+#app {
+    background: transparent !important;
+}
+
+#sidebar {
+    background: rgba(3, 7, 18, 0.6) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border-right: 1px solid rgba(0, 240, 255, 0.1) !important;
+}
+
+.nav-item.active {
+    background: linear-gradient(90deg, rgba(0, 240, 255, 0.1) 0%, transparent 100%) !important;
+    border-left: 3px solid var(--accent) !important;
+}
+
+#main-content {
+    background: transparent !important;
+}
+
+.glass-panel {
+    background: rgba(15, 23, 42, 0.5) !important;
+    border: 1px solid rgba(0, 240, 255, 0.15) !important;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+}
+
+.highlight-box {
+    background: linear-gradient(135deg, rgba(0, 240, 255, 0.05) 0%, rgba(3, 7, 18, 0) 100%) !important;
+    border-left: 4px solid #00f0ff !important;
+}
+
+.physics-term {
+    color: #00f0ff !important;
+    background: rgba(0, 240, 255, 0.1) !important;
+    border-bottom: 1px dashed #00f0ff !important;
+}
+
+.feature-table th {
+    background: rgba(0, 240, 255, 0.1) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1px !important;
+    color: #00f0ff !important;
+}
+
+.feature-table {
+    border: 1px solid rgba(0, 240, 255, 0.15) !important;
+}
+
+.tooltip {
+    background-color: #050b14 !important;
+    border: 1px solid #00f0ff !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.8) !important;
+    z-index: 99999 !important;
+}
+</style>
+
+
+</head>
+<body>
+
+    <div id="sky-bg">
+        <div class="cloud cloud-1"></div>
+        <div class="cloud cloud-2"></div>
+        <div class="cloud cloud-3"></div>
+    </div>
+
+    
+    <!-- Home Page -->
+    <div id="home-page" class="home-page">
+        <div class="home-content">
+            <i data-lucide="plane-takeoff" class="home-logo"></i>
+            <h1 class="home-title">AeroLearn</h1>
+            <p class="home-subtitle">This website is for beginners to learn about Airplanes from scratch.</p>
+            <div class="home-features">
+                <div class="feature-badge">
+                    <i data-lucide="play-circle"></i>
+                    <span>Animated Videos</span>
+                </div>
+                <div class="feature-badge">
+                    <i data-lucide="file-text"></i>
+                    <span>Textual Content</span>
+                </div>
+                <div class="feature-badge">
+                    <i data-lucide="check-circle-2"></i>
+                    <span>Interactive Quizzes</span>
+                </div>
+            </div>
+            <button class="start-btn" onclick="enterCourse()">Start Learning</button>
+        </div>
+        <footer class="home-footer">
+            Website made by IMTECH UOH STUDENTS
+        </footer>
+    </div>
+    
+    <div id="app" style="display: none;">
+        <!-- Sidebar -->
+        <aside id="sidebar" style="position: relative;">
+
+            <div id="sidebar-scrollbar-track" class="custom-track">
+                <div id="sidebar-keychain" class="custom-thumb">
+<svg width="100%" height="100%" viewBox="0 0 60 150" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="metal" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stop-color="#666"/>
+                                <stop offset="30%" stop-color="#eee"/>
+                                <stop offset="70%" stop-color="#ccc"/>
+                                <stop offset="100%" stop-color="#555"/>
+                            </linearGradient>
+                            <filter id="dropShadow">
+                                <feDropShadow dx="2" dy="5" stdDeviation="3" flood-opacity="0.5"/>
+                            </filter>
+                        </defs>
+                        <!-- Keyring -->
+                        <circle cx="30" cy="20" r="16" fill="none" stroke="url(#metal)" stroke-width="4" filter="url(#dropShadow)" />
+                        <!-- Chain -->
+                        <path d="M30 36 C 25 40, 35 45, 30 50 C 25 55, 35 60, 30 65" fill="none" stroke="url(#metal)" stroke-width="4" filter="url(#dropShadow)" />
+                        <!-- Jet pointing down -->
+                        <g filter="url(#dropShadow)">
+                            <!-- Wings -->
+                            <path d="M30 95 L2 75 L2 70 L30 85 Z" fill="url(#metal)" />
+                            <path d="M30 95 L58 75 L58 70 L30 85 Z" fill="url(#metal)" />
+                            <!-- Engines -->
+                            <rect x="15" y="80" width="4" height="10" rx="2" fill="url(#metal)" />
+                            <rect x="41" y="80" width="4" height="10" rx="2" fill="url(#metal)" />
+                            <!-- Tail -->
+                            <path d="M30 70 L15 55 L15 50 L30 65 Z" fill="url(#metal)" />
+                            <path d="M30 70 L45 55 L45 50 L30 65 Z" fill="url(#metal)" />
+                            <!-- Fuselage -->
+                            <path d="M25 55 L35 55 L35 125 C35 140 25 140 25 125 Z" fill="url(#metal)" />
+                            <!-- Cockpit Window -->
+                            <path d="M27 125 C 30 130, 30 130, 33 125 L 30 120 Z" fill="#222" />
+                        </g>
+                    </svg>
+                </div>
+            </div>
+            <div class="sidebar-header" onclick="returnToHome()" style="cursor: pointer;" title="Return to Home">
+                <i data-lucide="plane-takeoff" class="logo-icon"></i>
+                <h1>AeroLearn</h1>
+            </div>
+            <nav id="nav-menu">
+                <!-- Navigation items injected via JS -->
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main id="main-content" style="position: relative;">
+
+            <div id="custom-scrollbar-track" class="custom-track">
+                <div id="custom-keychain" class="custom-thumb">
+                    <svg width="100%" height="100%" viewBox="0 0 60 150" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="metal" x1="0%" y1="0%" x2="100%" y2="0%">
+                                <stop offset="0%" stop-color="#666"/>
+                                <stop offset="30%" stop-color="#eee"/>
+                                <stop offset="70%" stop-color="#ccc"/>
+                                <stop offset="100%" stop-color="#555"/>
+                            </linearGradient>
+                            <filter id="dropShadow">
+                                <feDropShadow dx="2" dy="5" stdDeviation="3" flood-opacity="0.5"/>
+                            </filter>
+                        </defs>
+                        <!-- Keyring -->
+                        <circle cx="30" cy="20" r="16" fill="none" stroke="url(#metal)" stroke-width="4" filter="url(#dropShadow)" />
+                        <!-- Chain -->
+                        <path d="M30 36 C 25 40, 35 45, 30 50 C 25 55, 35 60, 30 65" fill="none" stroke="url(#metal)" stroke-width="4" filter="url(#dropShadow)" />
+                        <!-- Jet pointing down -->
+                        <g filter="url(#dropShadow)">
+                            <!-- Wings -->
+                            <path d="M30 95 L2 75 L2 70 L30 85 Z" fill="url(#metal)" />
+                            <path d="M30 95 L58 75 L58 70 L30 85 Z" fill="url(#metal)" />
+                            <!-- Engines -->
+                            <rect x="15" y="80" width="4" height="10" rx="2" fill="url(#metal)" />
+                            <rect x="41" y="80" width="4" height="10" rx="2" fill="url(#metal)" />
+                            <!-- Tail -->
+                            <path d="M30 70 L15 55 L15 50 L30 65 Z" fill="url(#metal)" />
+                            <path d="M30 70 L45 55 L45 50 L30 65 Z" fill="url(#metal)" />
+                            <!-- Fuselage -->
+                            <path d="M25 55 L35 55 L35 125 C35 140 25 140 25 125 Z" fill="url(#metal)" />
+                            <!-- Cockpit Window -->
+                            <path d="M27 125 C 30 130, 30 130, 33 125 L 30 120 Z" fill="#222" />
+                        </g>
+                    </svg>
+                </div>
+            </div>
+
+            <header class="mobile-header">
+                <button id="mobile-menu-btn"><i data-lucide="menu"></i></button>
+                <h2>AeroLearn</h2>
+            </header>
+
+            <div class="content-wrapper" id="content-area">
+                <!-- Content injected via JS -->
+            </div>
+        </main>
+
+    <!-- Scroll to Top Button -->
+    <button id="scroll-to-top-btn" onclick="scrollToTop()" title="Scroll to Top">
+        <i data-lucide="plane" style="transform: rotate(-45deg);"></i>
+    </button>
+
+    </div>
+
+    <!-- Physics Term Tooltip / Modal -->
+    <div id="physics-tooltip" class="tooltip hidden">
+        <h4 id="tooltip-title">Term</h4>
+        <p id="tooltip-desc">Definition goes here.</p>
+    </div>
+
+    <script>
+const courseData = [
+    {
+        id: "intro",
+        title: "Introduction",
+        hasVideo: false,
+        textContent: `
+            <h2>Welcome to Understanding the Airplane</h2>
+            
+            <div style="background: rgba(100, 255, 218, 0.05); padding: 1.5rem; border-left: 4px solid var(--accent); margin: 2rem 0; border-radius: 4px;">
+                <h3 style="color: var(--text-light); margin-top: 0;">What is Aeronautics?</h3>
+                <p style="margin-bottom: 0;"><span class="physics-term" data-definition="The study or practice of travel through the air.">Aeronautics</span> is the science of <span class="physics-term" data-definition="The process by which an object moves through space without contacting any planetary surface.">flight</span>. It encompasses everything from the physical laws that allow a heavy machine to leave the ground, to the high-tech engineering required to build engines capable of producing tens of thousands of pounds of <span class="physics-term" data-definition="The forward force produced by the powerplant/propeller or rotor.">thrust</span>.</p>
+            </div>
+
+            <p>In this interactive course, you will learn the fundamental principles of flight, the complex engineering behind modern aircraft design, and the intricate systems that keep airplanes safely in the sky.</p>
+            
+            <p>The journey from the Wright brothers' first flight in 1903 to the modern <span class="physics-term" data-definition="Speed that exceeds the speed of sound (Mach 1 or approx. 768 mph).">supersonic</span> jets of today has been driven by a relentless pursuit of <span class="physics-term" data-definition="The ratio of the aerodynamic lift to the aerodynamic drag of an aircraft.">aerodynamic efficiency</span> and engineering perfection. This course is designed to break down those complex concepts into easy-to-understand, visual modules.</p>
+
+            <h3 style="margin-top: 2rem;">Course Structure</h3>
+            <p>We will cover the following key areas:</p>
+            <ol style="margin-bottom: 2rem; color: var(--text-muted);">
+                <li><strong><span class="physics-term" data-definition="The study of the properties of moving air and the interaction between the air and solid bodies moving through it.">Aerodynamics</span>:</strong> How the invisible forces of air can be manipulated to generate <span class="physics-term" data-definition="A force that directly opposes the weight of an airplane and holds it in the air.">Lift</span>.</li>
+                <li><strong>Structures:</strong> The physical anatomy of an airplane, from the <span class="physics-term" data-definition="The main body of an aircraft.">fuselage</span> to the <span class="physics-term" data-definition="The tail assembly of an aircraft, providing stability and control.">empennage</span>.</li>
+                <li><strong><span class="physics-term" data-definition="The action of driving or pushing forward.">Propulsion</span>:</strong> How jet engines compress air and burn fuel to create massive amounts of thrust.</li>
+                <li><strong>Systems:</strong> The hydraulic, pneumatic, and environmental control systems that act as the aircraft's nervous system.</li>
+            </ol>
+
+            <p><strong>How to use this course:</strong></p>
+            <ul style="color: var(--text-muted);">
+                <li>Navigate through the topics using the sidebar menu on the left.</li>
+                <li>Watch the Animated Videos to Visualize and Understand.</li>
+                <li>Read through the comprehensive textual content and hover over highlighted physics terms to instantly see their scientific definitions.</li>
+                <li>At the end of each section, switch to the <strong>Knowledge Check</strong> tab to test what you've learned!</li>
+            </ul>
+        `,
+        quiz: [] // No quiz for intro
+    },
+    {
+        id: "parts-of-plane",
+        animationType: "blueprint",
+        title: "Parts of a Plane",
+        hasVideo: true,
+        videoPlaceholder: "parts_poster.png",
+        textContent: `
+            <h2>Parts of a Plane</h2>
+            <p>The design of an airplane is a masterclass in structural engineering and fluid dynamics. Every part is meticulously engineered to manage the four fundamental forces of flight: <span class="physics-term" data-definition="Upward force acting on the aircraft.">lift</span>, <span class="physics-term" data-definition="Downward force caused by gravity.">weight</span>, <span class="physics-term" data-definition="Forward force produced by the powerplant.">thrust</span>, and <span class="physics-term" data-definition="Backward force caused by air resistance.">drag</span>.</p>
+
+            <h3>Primary Structural Components</h3>
+            <div class="parts-grid">
+                <div class="part-card">
+                    <i data-lucide="box" class="sticker-icon"></i>
+                    <h4>Fuselage</h4>
+                    <p>The main body of the aircraft. Designed to be highly <span class="physics-term" data-definition="Having a shape that reduces the drag from air moving past.">aerodynamic</span>, it minimizes drag while maintaining structural integrity to withstand intense pressure changes.</p>
+                </div>
+                
+                <div class="part-card">
+                    <i data-lucide="wind" class="sticker-icon"></i>
+                    <h4>Wings</h4>
+                    <p>The primary lift-generating devices. They utilize an <span class="physics-term" data-definition="A streamlined shape designed to generate lift when fluid flows around it.">airfoil</span> shape to create a pressure differential (higher pressure below, lower pressure above), generating upward lift.</p>
+                </div>
+
+                <div class="part-card">
+                    <i data-lucide="navigation" class="sticker-icon"></i>
+                    <h4>Empennage (Tail)</h4>
+                    <p>Provides critical stability. It includes the <strong>Vertical Stabilizer</strong> (prevents side-to-side <span class="physics-term" data-definition="Rotation around the vertical axis.">yaw</span>) and <strong>Horizontal Stabilizer</strong> (prevents nose-up/down <span class="physics-term" data-definition="Rotation around the lateral axis.">pitch</span>).</p>
+                </div>
+
+                <div class="part-card">
+                    <i data-lucide="flame" class="sticker-icon"></i>
+                    <h4>Powerplant</h4>
+                    <p>The engine system responsible for propulsion. Housed in <span class="physics-term" data-definition="A streamlined housing or enclosure for an engine.">nacelles</span>, these jet engines burn fuel to generate massive thrust to overcome drag.</p>
+                </div>
+
+                <div class="part-card" style="grid-column: 1 / -1;">
+                    <i data-lucide="circle-dashed" class="sticker-icon"></i>
+                    <h4>Landing Gear</h4>
+                    <p>The shock-absorbing structure allowing the aircraft to taxi, take off, and land. Often retractable to severely reduce drag during flight.</p>
+                </div>
+            </div>
+
+            <h3 style="margin-top: 2rem;">Flight Control Surfaces</h3>
+            <p>Moveable components attached to the main structures that allow the pilot to change the aircraft's attitude and direction in the air.</p>
+
+            <table class="modern-table">
+                <thead>
+                    <tr>
+                        <th>Control Surface</th>
+                        <th>Location</th>
+                        <th>Axis Controlled</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Ailerons</strong></td>
+                        <td>Trailing edge of wings</td>
+                        <td><span class="physics-term" data-definition="Rotation around the longitudinal (front-to-back) axis.">Roll</span></td>
+                        <td>Move in opposite directions to bank the plane left or right.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Elevators</strong></td>
+                        <td>Horizontal stabilizer</td>
+                        <td><span class="physics-term" data-definition="Rotation around the lateral (side-to-side) axis.">Pitch</span></td>
+                        <td>Control the nose up or down to climb or descend.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Rudder</strong></td>
+                        <td>Vertical stabilizer</td>
+                        <td><span class="physics-term" data-definition="Rotation around the vertical axis.">Yaw</span></td>
+                        <td>Moves the nose left or right.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Flaps & Slats</strong></td>
+                        <td>Wings (Front & Back)</td>
+                        <td>Lift Augmentation</td>
+                        <td>Increases wing curvature to allow flying at low speeds without <span class="physics-term" data-definition="A sudden reduction in the lift generated by an airfoil.">stalling</span>.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3 style="margin-top: 2rem;">Hidden Engineering</h3>
+            <div class="parts-grid">
+                <div class="part-card">
+                    <i data-lucide="cpu" class="sticker-icon" style="color: var(--highlight);"></i>
+                    <h4>Avionics (The Brain)</h4>
+                    <p>The electronic nervous system. It includes the Flight Management System (FMS) and <span class="physics-term" data-definition="A system that replaces conventional manual flight controls with an electronic interface.">Fly-by-Wire</span> technology, which turns pilot inputs into digital commands.</p>
+                </div>
+                <div class="part-card">
+                    <i data-lucide="droplet" class="sticker-icon" style="color: #4facfe;"></i>
+                    <h4>Hydraulics (The Muscles)</h4>
+                    <p>Pressurized fluid systems that power heavy <span class="physics-term" data-definition="A mechanical device for moving or controlling a mechanism or system.">actuators</span> to move control surfaces. Built with heavy <span class="physics-term" data-definition="The inclusion of extra components which are not strictly necessary to functioning, in case of failure in other components.">redundancy</span> for ultimate safety.</p>
+                </div>
+            </div>
+        `,
+        quiz: [
+            {
+                type: 'mcq',
+                q: "Which component is considered the 'main body' of the aircraft?",
+                options: ["Wings", "Fuselage", "Empennage", "Powerplant"],
+                answer: 1,
+                exp: "The fuselage is the central body of an aircraft designed to accommodate the crew, passengers, and cargo."
+            },
+            {
+                type: 'fill-blank',
+                q: "The invisible forces of air can be manipulated by the wings to generate _________.",
+                answer: "lift",
+                altAnswers: ["Lift"],
+                exp: "Wings have an airfoil shape that creates a pressure differential, generating upward lift."
+            },
+            {
+                type: 'mcq',
+                q: "What is the primary function of the Landing Gear?",
+                options: ["Generate thrust", "Control yaw", "Support the aircraft during taxi, takeoff, and landing", "House the avionics"],
+                answer: 2,
+                exp: "Landing gear absorbs the shock of landing and supports the plane on the ground."
+            },
+            {
+                type: 'match',
+                q: "Match the structural component to its common nickname/function:",
+                pairs: [
+                    { left: "Avionics", right: "The Brain" },
+                    { left: "Hydraulics", right: "The Muscles" },
+                    { left: "Powerplant", right: "Propulsion" },
+                    { left: "Empennage", right: "Tail Assembly" }
+                ],
+                exp: "Avionics are the electronic brains, hydraulics act as the heavy-lifting muscles, the powerplant pushes the plane, and the empennage stabilizes the tail."
+            },
+            {
+                type: 'fill-blank',
+                q: "Jet engines are usually housed in streamlined enclosures called _________.",
+                answer: "nacelles",
+                altAnswers: ["Nacelles", "nacelle", "Nacelle"],
+                exp: "Nacelles are aerodynamic housings that hold the engines and reduce drag."
+            },
+            {
+                type: 'mcq',
+                q: "Which flight control surface controls the 'Roll' of the aircraft?",
+                options: ["Elevator", "Rudder", "Flaps", "Ailerons"],
+                answer: 3,
+                exp: "Ailerons, located on the trailing edges of the wings, move in opposite directions to roll the plane."
+            },
+            {
+                type: 'match',
+                q: "Match the control surface to the axis it controls:",
+                pairs: [
+                    { left: "Ailerons", right: "Roll" },
+                    { left: "Elevators", right: "Pitch" },
+                    { left: "Rudder", right: "Yaw" }
+                ],
+                exp: "Ailerons control Roll, Elevators control Pitch, and the Rudder controls Yaw."
+            },
+            {
+                type: 'fill-blank',
+                q: "The tail assembly, which provides stability, is formally known as the _________.",
+                answer: "empennage",
+                altAnswers: ["Empennage"],
+                exp: "The empennage is the entire tail section, including vertical and horizontal stabilizers."
+            },
+            {
+                type: 'mcq',
+                q: "What is the purpose of Flaps and Slats?",
+                options: ["To increase speed", "To steer the aircraft left and right", "To increase lift at lower speeds", "To burn fuel more efficiently"],
+                answer: 2,
+                exp: "Flaps and slats extend to increase the wing's surface area and curvature, allowing the plane to fly slower without stalling."
+            },
+            {
+                type: 'fill-blank',
+                q: "The technology that replaces traditional manual flight controls with an electronic interface is called _________.",
+                answer: "Fly-by-wire",
+                altAnswers: ["fly by wire", "fly-by-wire", "Fly by wire"],
+                exp: "Fly-by-wire systems use computers to process pilot inputs and send electrical signals to the actuators."
+            },
+            {
+                type: 'mcq',
+                q: "Why do critical aircraft systems like hydraulics feature 'redundancy'?",
+                options: ["To make the plane heavier", "In case of a failure, a backup system can take over", "To increase fuel consumption", "To look cooler"],
+                answer: 1,
+                exp: "Redundancy means having multiple independent systems (like 3 hydraulic circuits) so that if one fails, the others keep the plane flying safely."
+            },
+            {
+                type: 'match',
+                q: "Match the Stabilizer to the movement it prevents:",
+                pairs: [
+                    { left: "Vertical Stabilizer", right: "Prevents Yaw" },
+                    { left: "Horizontal Stabilizer", right: "Prevents Pitch" }
+                ],
+                exp: "The Vertical Stabilizer acts like a weather vane to stop side-to-side yaw, while the Horizontal Stabilizer stops nose-up/down pitch."
+            },
+            {
+                type: 'fill-blank',
+                q: "A sudden reduction in the lift generated by an airfoil is called a _________.",
+                answer: "stall",
+                altAnswers: ["Stall"],
+                exp: "A stall occurs when the wing angle is too steep, causing the smooth airflow to break away and destroy lift."
+            }
+        ]
+    }
+];
+
+window.courseData = courseData;
+</script>
+    <script>
+window.courseData.push(
+    {
+        id: "aircraft-components",
+        title: "Aircraft Components",
+        hasVideo: true,
+        videoPlaceholder: "components_poster.png",
+        textContent: `
+
+            <h2>Systems Architecture & Deep Integration</h2>
+            <p>To understand an aircraft deeply, we must move beyond viewing it as a mere "collection of parts" and analyze it through the lens of <strong>Hierarchical Systems Architecture</strong>. A modern airliner is essentially a flying data center wrapped in <span class="physics-term" data-definition="Lightweight, high-strength metals resistant to extreme temperatures and corrosion.">Aerospace-Grade Titanium</span> and <span class="physics-term" data-definition="Materials made from two or more constituent materials with significantly different physical or chemical properties.">Carbon-Fiber Composites</span>.</p>
+            
+            <p>Every single bolt, wire, and hydraulic line is meticulously planned to contribute to a larger, cohesive ecosystem. When a pilot pulls back on the yoke, they aren't just pulling a physical cable; they are initiating a cascade of digital commands, fluid dynamics, and electrical power generation.</p>
+
+            <div class="highlight-box">
+                <h3><i data-lucide="layers"></i> The Core Philosophy of Aerospace</h3>
+                <p>Engineering a commercial aircraft involves compartmentalizing immense complexity into distinct, manageable systems that interact seamlessly. Every critical system must feature <span class="physics-term" data-definition="The inclusion of extra components which are not strictly necessary to functioning, in case of failure in other components.">Absolute Redundancy</span>. If a primary computer fails, a secondary <span class="physics-term" data-definition="An electronic system managing specific aircraft functions.">Avionics Node</span> instantly takes over. If an engine fails, the remaining engine possesses enough <span class="physics-term" data-definition="The forward force produced by engines, measured in pounds or Newtons.">Excess Thrust</span> to safely complete the flight.</p>
+            </div>
+
+            <div class="content-grid">
+                <div class="glass-panel">
+                    <h3><i data-lucide="shield"></i> 1. Structural (Airframe)</h3>
+                    <p>The skeleton that handles intense mechanical loads. It utilizes a <strong>Semi-Monocoque</strong> design where the external aluminum or composite skin absorbs a massive portion of the <span class="physics-term" data-definition="Forces that stretch or pull apart structural components.">Tensile Stress</span> alongside internal ribs and spars, preventing catastrophic <span class="physics-term" data-definition="Structural failure caused by repeated cyclic loading.">Metal Fatigue</span>.</p>
+                </div>
+                <div class="glass-panel">
+                    <h3><i data-lucide="flame"></i> 2. Propulsion</h3>
+                    <p>The powerhouses generating forward momentum. Usually composed of High-Bypass Turbofan engines operating on the continuous <span class="physics-term" data-definition="A thermodynamic cycle describing the workings of a constant-pressure heat engine.">Brayton Thermodynamic Cycle</span>, providing both forward velocity and immense rotational energy to power all auxiliary systems.</p>
+                </div>
+                <div class="glass-panel">
+                    <h3><i data-lucide="move"></i> 3. Flight Controls</h3>
+                    <p>The aerodynamic steering mechanism. Consists of primary surfaces like ailerons and elevators, controlled by powerful actuators that overcome massive <span class="physics-term" data-definition="The resistance of air against the movement of a solid object.">Aerodynamic Drag</span> and monitored by triple-redundant Flight Control Computers (FCCs).</p>
+                </div>
+                <div class="glass-panel">
+                    <h3><i data-lucide="thermometer"></i> 4. Environmental (ECS)</h3>
+                    <p>Maintains a habitable micro-climate at 35,000 feet. Uses scorching hot engine <span class="physics-term" data-definition="Compressed air taken from the engine compressor stage before fuel is injected.">Bleed Air</span> to pressurize the cabin and regulate temperature in an otherwise freezing, oxygen-deprived environment where the outside air pressure is lethally low.</p>
+                </div>
+                <div class="glass-panel">
+                    <h3><i data-lucide="cpu"></i> 5. Avionics</h3>
+                    <p>The "Brain" of the aircraft. Includes the Flight Management System (FMS), weather-penetrating <span class="physics-term" data-definition="Radio detection and ranging systems used to map weather and terrain.">Doppler Radars</span>, autopilot algorithms, and global satellite communication arrays to navigate the skies with pinpoint precision.</p>
+                </div>
+                <div class="glass-panel">
+                    <h3><i data-lucide="droplet"></i> 6. Hydraulic/Pneumatic</h3>
+                    <p>The "Muscles". Hydraulics transmit immense mechanical force using <span class="physics-term" data-definition="Fluids that do not decrease in volume when subjected to pressure.">Incompressible Liquids</span> (like Skydrol), while pneumatics handle high-volume air-driven utility tasks, such as spinning up the massive engines during startup.</p>
+                </div>
+            </div>
+            
+        `,
+        quiz: [
+            { type: 'mcq', q: "What does 'semi-monocoque' refer to?", options: ["A type of engine", "A structure where the skin carries part of the load", "A flight control software", "A landing gear system"], answer: 1, exp: "In semi-monocoque construction, the aircraft's outer skin shares the structural load with internal frames." },
+            { type: 'fill-blank', q: "Jet engines operate on the _________ Thermodynamic Cycle.", answer: "brayton", altAnswers: ["Brayton", "brayton"], exp: "Jet engines operate on the continuous Brayton Cycle (Intake, Compression, Combustion, Exhaust)." },
+            { type: 'match', q: "Match the aircraft system to its core function:", pairs: [ { left: "Avionics", right: "The Brain" }, { left: "Hydraulic/Pneumatic", right: "The Muscles" }, { left: "Airframe", right: "The Skeleton" } ], exp: "Avionics are the electronic brain, hydraulics act as the muscles, and the airframe is the skeleton." },
+            { type: 'mcq', q: "What handles the intense mechanical loads of the aircraft?", options: ["The Avionics", "The Airframe", "The ECS", "The Hydraulics"], answer: 1, exp: "The Airframe is the skeleton that handles tensile stress and aerodynamic loads." },
+            { type: 'fill-blank', q: "The system responsible for maintaining habitability at 35,000 feet is the Environmental _________ System (ECS).", answer: "control", altAnswers: ["Control", "control"], exp: "The ECS regulates temperature and pressure." },
+            { type: 'mcq', q: "Where does the ECS get its high-pressure air from?", options: ["External vents", "Engine Bleed Air", "Oxygen tanks", "The APU only"], answer: 1, exp: "It taps scorching hot bleed air from the engine compressors." },
+            { type: 'match', q: "Match the structural concept to its definition:", pairs: [ { left: "Tensile Stress", right: "Pulling or stretching force" }, { left: "Metal Fatigue", right: "Weakening from cyclic loads" }, { left: "Redundancy", right: "Extra backup systems" } ], exp: "These are fundamental principles in aerospace engineering." },
+            { type: 'fill-blank', q: "The 'Muscles' of the aircraft that transmit immense mechanical force using incompressible liquids are the _________ systems.", answer: "hydraulic", altAnswers: ["Hydraulic", "hydraulic", "hydraulics"] , exp: "Hydraulics use liquids like Skydrol to move heavy flight controls." },
+            { type: 'mcq', q: "Which system includes the Flight Management System and Doppler Radars?", options: ["Propulsion", "Avionics", "Airframe", "Pneumatics"], answer: 1, exp: "Avionics comprises all electronic and computer systems on board." },
+            { type: 'mcq', q: "What is absolute redundancy?", options: ["Deleting unnecessary files", "Having multiple independent backup systems", "Making the plane lighter", "Using single-point failure designs"], answer: 1, exp: "Redundancy ensures that if one system fails, another instantly takes over." }
+        ]
+    },
+    {
+        id: "parts-vs-components",
+        title: "Parts vs. Components",
+        hasVideo: false,
+        textContent: `
+
+            <h2>Parts vs. Components: The Paradigm Shift</h2>
+            <p>In advanced aerospace engineering and aircraft maintenance, distinguishing between a "Part" and a "Component" is absolutely critical. They represent entirely different paradigms of the aircraft's lifecycle, supply chain, and troubleshooting methodology.</p>
+            
+            <p>A mechanic replacing a part uses a wrench; an engineer diagnosing a component uses a laptop and a <span class="physics-term" data-definition="A device used to test and diagnose electronic logic circuits.">Digital Multimeter</span> to track <span class="physics-term" data-definition="The difference in electrical potential between two points.">Voltage Drops</span> across a massive network.</p>
+
+            <table class="feature-table">
+                <thead>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>The "Parts" Perspective</th>
+                        <th>The "Components" Perspective</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Definition</strong></td>
+                        <td>A singular, physical, tangible item that cannot be meaningfully disassembled further.</td>
+                        <td>An integrated, multi-part assembly providing a specific, complex capability to the aircraft.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Analogy</strong></td>
+                        <td>A specific titanium screw, a copper wire, or a silicon microchip.</td>
+                        <td>The entire functioning Operating System or a complete hydraulic pump assembly.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Focus</strong></td>
+                        <td>The <strong>What</strong> (Physical existence, material properties, <span class="physics-term" data-definition="The maximum stress a material can withstand while being stretched.">Tensile Strength</span>).</td>
+                        <td>The <strong>How</strong> (Logical execution, operational performance, data throughput).</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Failure Mode</strong></td>
+                        <td>A localized hardware failure (e.g., a hinge snaps due to <span class="physics-term" data-definition="Deterioration of a material due to chemical reactions with its environment.">Corrosion</span>).</td>
+                        <td>A systemic or logical failure (e.g., a software bug causing an infinite loop in the autopilot).</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="highlight-box">
+                <h3><i data-lucide="settings"></i> Real-World Example: The Flap Deployment System</h3>
+                <p>If a single high-strength steel bolt holding a wing flap breaks under load, that is a classic <strong>Part Failure</strong>. The solution is simply to unscrew it and replace it. However, if the Fly-By-Wire computer encounters a sensor glitch and sends the wrong deployment angle to the electric flap motors, the physical parts are perfectly fine, but the <strong>Component Capability</strong> has failed. Troubleshooting this requires analyzing <span class="physics-term" data-definition="Information sent electronically between aircraft systems.">Digital Telemetry Data</span> rather than looking for a broken piece of metal.</p>
+            </div>
+            
+        `,
+        quiz: [
+            { type: 'mcq', q: "Which is the best example of a 'Part'?", options: ["The entire Flap System", "The Fly-By-Wire software", "A single titanium bolt", "The Autopilot network"], answer: 2, exp: "A part is a singular, physical item that cannot be meaningfully disassembled." },
+            { type: 'fill-blank', q: "Troubleshooting a failing component usually involves tracking _________ drops across an electronic network.", answer: "voltage", altAnswers: ["Voltage", "voltage"], exp: "Engineers use digital multimeters to track voltage drops to find logic failures in components." },
+            { type: 'match', q: "Match the failure mode to its category:", pairs: [ { left: "Hinge snaps from corrosion", right: "Part Failure" }, { left: "Software bug in autopilot", right: "Component Failure" }, { left: "Testing requires a multimeter", right: "Component Diagnostics" } ], exp: "Parts break physically; components fail logically or systemically." },
+            { type: 'mcq', q: "What does a 'Component' represent in aerospace engineering?", options: ["A single screw", "An integrated assembly providing a specific capability", "A type of fuel", "A passenger seat"], answer: 1, exp: "Components are complex assemblies, like the entire flap deployment system." },
+            { type: 'fill-blank', q: "When a titanium bolt snaps, it is a localized _________ failure.", answer: "hardware", altAnswers: ["Hardware", "hardware", "part"], exp: "A bolt snapping is a physical hardware (part) failure." },
+            { type: 'match', q: "Match the focus to the paradigm:", pairs: [ { left: "The 'What' (Physical existence)", right: "Parts Perspective" }, { left: "The 'How' (Logical execution)", right: "Components Perspective" } ], exp: "Parts are about physical material; components are about operational logic." },
+            { type: 'mcq', q: "If the Fly-By-Wire computer sends the wrong deployment angle to the motors, what has failed?", options: ["The physical flap part", "The Component Capability", "The landing gear", "The fuselage"], answer: 1, exp: "The parts are fine, but the integrated component logic has failed." },
+            { type: 'fill-blank', q: "A part cannot be meaningfully _________ further.", answer: "disassembled", altAnswers: ["Disassembled", "disassembled", "broken down"], exp: "By definition, a part is the lowest level of physical item." },
+            { type: 'mcq', q: "Which tool is an engineer most likely to use to diagnose a systemic component failure?", options: ["A wrench", "A digital multimeter", "A hammer", "A rivet gun"], answer: 1, exp: "Systemic failures require tracing logic and digital signals." },
+            { type: 'mcq', q: "Why is distinguishing between parts and components critical?", options: ["It changes how the plane flies", "It dictates entirely different troubleshooting paradigms and supply chains", "It affects ticket prices", "It determines the color of the aircraft"], answer: 1, exp: "Troubleshooting a snapped bolt is vastly different from debugging software." }
+        ]
+    },
+    {
+        id: "how-it-flies",
+        animationType: "windtunnel",
+        title: "How does an Airplane Fly?",
+        hasVideo: true,
+        videoPlaceholder: "flies_poster.png",
+        textContent: `
+
+            <h2>How does an Airplane Fly? The Aerodynamic Truth</h2>
+            <p>Flight is the absolute mastery of fluid dynamics. An aircraft, weighing hundreds of tons, takes off by manipulating the invisible air around it to generate a massive, sustained <span class="physics-term" data-definition="Upward aerodynamic force opposing the weight of the aircraft.">Lift Force</span> that physically exceeds the downward pull of <span class="physics-term" data-definition="The force that attracts a body toward the center of the earth.">Gravity</span>.</p>
+            
+            <p>For decades, there has been a debate over whether planes fly because of pressure differences (Bernoulli) or because they skip off the air like a stone (Newton). The truth is, both principles work simultaneously to keep the aircraft suspended in the sky.</p>
+
+            <div class="content-grid">
+                <div class="glass-panel">
+                    <h3><i data-lucide="wind"></i> Bernoulli's Principle (The Vacuum)</h3>
+                    <p>The wing is shaped as a highly engineered <strong>Airfoil</strong> (curved on top, flatter on the bottom). As the wing tears through the atmosphere at 500 MPH, the air traveling over the extended curve of the top must accelerate to keep up. According to Daniel Bernoulli's fluid equations, a faster-moving fluid inherently creates an area of <strong>Low Pressure</strong>. The standard, higher pressure atmosphere beneath the wing essentially pushes the airplane upward into this artificial vacuum.</p>
+                </div>
+                <div class="glass-panel">
+                    <h3><i data-lucide="arrow-down-up"></i> Newton's Third Law (The Deflection)</h3>
+                    <p>"For every action, there is an equal and opposite reaction." The underside of the wing strikes the oncoming air at a slight upward angle. This angle physically deflects millions of pounds of air downwards every single minute. The violent reaction to pushing all that <span class="physics-term" data-definition="The amount of matter contained in a volume of air.">Air Mass</span> down is a massive, reactive force pushing the wing (and the airplane) up.</p>
+                </div>
+            </div>
+
+            <div class="highlight-box">
+                <h3><i data-lucide="alert-triangle"></i> The Ultimate Danger: The Aerodynamic Stall</h3>
+                <p>Lift is entirely dependent on smooth, attached <span class="physics-term" data-definition="Airflow where fluid particles follow smooth paths without crossing.">Laminar Airflow</span>. If the pilot pulls the nose up too aggressively, the <span class="physics-term" data-definition="The angle between the oncoming air and the wing's chord line.">Angle of Attack</span> becomes dangerously steep. The air can no longer bend to follow the steep curve of the wing. It violently separates from the metal, turning into chaotic, tumbling <span class="physics-term" data-definition="Chaotic, irregular fluid flow characterized by swirling eddies.">Turbulent Eddies</span>. This instantly destroys the low-pressure zone, causing an aerodynamic <strong>Stall</strong>. The wing completely stops flying, and the aircraft simply falls like a rock until airflow is restored.</p>
+            </div>
+            
+        `,
+        quiz: [
+            { type: 'mcq', q: "According to Bernoulli's principle, faster-moving air over the wing creates an area of:", options: ["High Pressure", "Low Pressure", "Zero Gravity", "Turbulence"], answer: 1, exp: "Faster fluid creates low pressure, effectively creating a vacuum above the wing." },
+            { type: 'fill-blank', q: "If the Angle of Attack becomes too steep, the wing will _________.", answer: "stall", altAnswers: ["Stall", "stall"], exp: "A stall occurs when the air separates from the wing, destroying lift instantly." },
+            { type: 'match', q: "Match the aerodynamic concept to its effect:", pairs: [ { left: "Low pressure above wing", right: "Bernoulli's Principle" }, { left: "Deflecting air downwards", right: "Newton's Third Law" }, { left: "Chaotic swirling eddies", right: "Turbulence" } ], exp: "Both Bernoulli and Newton explain how lift is generated." },
+            { type: 'mcq', q: "What is the shape of a wing called?", options: ["Rectangle", "Airfoil", "Cylinder", "Sphere"], answer: 1, exp: "An airfoil is curved on top and flatter on the bottom." },
+            { type: 'fill-blank', q: "An aircraft takes off by manipulating the invisible air around it to generate a massive, sustained _________ Force.", answer: "lift", altAnswers: ["Lift", "lift"], exp: "Lift opposes the downward pull of gravity." },
+            { type: 'match', q: "Match the airflow type to its characteristic:", pairs: [ { left: "Laminar Airflow", right: "Smooth, attached paths" }, { left: "Turbulent Eddies", right: "Chaotic, separated air" } ], exp: "Laminar flow creates lift; turbulent flow destroys it." },
+            { type: 'mcq', q: "Newton's Third Law states that for every action, there is an:", options: ["Equal and opposite reaction", "Unequal reaction", "Increase in pressure", "Aerodynamic stall"], answer: 0, exp: "Pushing air down forces the wing up." },
+            { type: 'fill-blank', q: "A stall instantly destroys the _________-pressure zone above the wing.", answer: "low", altAnswers: ["Low", "low"], exp: "When airflow separates, the vacuum (low pressure) vanishes." },
+            { type: 'mcq', q: "What happens to the aircraft during an aerodynamic stall?", options: ["It goes supersonic", "The wing completely stops flying and the aircraft falls", "It hovers in place", "The engines explode"], answer: 1, exp: "A stall is a loss of lift, causing the plane to drop like a rock." },
+            { type: 'mcq', q: "Why does air travel faster over the top of the wing?", options: ["Because it is colder", "Because the curved shape forces it to travel a longer distance in the same time", "Because the engines push it", "Because of the flaps"], answer: 1, exp: "The extended curve of the airfoil forces the air to accelerate to keep up." }
+        ]
+    }
+);
+
+</script>
+    <script>
+window.courseData.push(
+    {
+        id: "winglets",
+        title: "Do all Airplanes have Winglets?",
+        hasVideo: true,
+        videoPlaceholder: "winglets_poster.png",
+        textContent: `
+
+            <h2>Do All Aircraft Have Winglets? The War on Drag</h2>
+            <p>Look closely at the tips of a modern airliner's wings—you'll likely see them sweeping upward into graceful, shark-fin like vertical barriers. These are called <strong>Winglets</strong>, and they represent one of the most brilliant, billions-of-dollars-saving aerodynamic inventions in modern commercial aviation history.</p>
+            
+            <p>To understand why they exist, we must understand the invisible, energy-draining tornados that plague every single aircraft that takes to the skies.</p>
+
+            <div class="highlight-box">
+                <h3><i data-lucide="repeat"></i> The Problem: Wingtip Vortices</h3>
+                <p>Because there is high-pressure air trapped under the wing and low-pressure air above it, the air naturally tries to escape. At the very tip of the wing, the high-pressure air aggressively rolls over the edge to fill the low-pressure void on top. As the plane moves forward, this rolling action creates massive, horizontal, spinning tornados of air trailing behind the plane known as <span class="physics-term" data-definition="Circular patterns of violently rotating air left behind a wing as it generates lift.">Wingtip Vortices</span>.</p>
+                <p>Creating these massive tornados requires immense physical energy from the engines, which manifests as <span class="physics-term" data-definition="Aerodynamic drag produced specifically by the generation of lift.">Induced Drag</span>, slowing the plane down and wasting thousands of gallons of expensive jet fuel.</p>
+            </div>
+
+            <div class="content-grid">
+                <div class="glass-panel">
+                    <h3><i data-lucide="check-circle"></i> The Winglet Solution</h3>
+                    <p>By adding a physical vertical barrier right at the tip, the high-pressure air is literally blocked from rolling over onto the top. This dramatically shrinks the size and intensity of the vortices. This simple addition reduces induced drag by up to 5%—saving airlines millions of dollars and drastically reducing carbon emissions over the lifespan of the aircraft.</p>
+                </div>
+                <div class="glass-panel">
+                    <h3><i data-lucide="x-circle"></i> Why Don't All Planes Have Them?</h3>
+                    <p>Winglets are not magic; they add structural weight and complex <span class="physics-term" data-definition="Twisting forces applied to a structural component.">Torsional Stresses</span> to the wing. For extremely short-haul flights, the fuel saved during the brief cruise phase isn't enough to offset the extra weight the engines had to carry during the steep climb. Also, some hyper-efficient planes (like the Boeing 777) achieve the same exact aerodynamic efficiency by simply making their wings significantly longer and incredibly flexible instead.</p>
+                </div>
+            </div>
+            
+        `,
+        quiz: [
+            { type: 'mcq', q: "What is the primary purpose of winglets?", options: ["To look cool", "To hold extra fuel", "To block high-pressure air from rolling over the wingtip", "To serve as antennas"], answer: 2, exp: "Winglets physically block the air, reducing wingtip vortices." },
+            { type: 'fill-blank', q: "Wingtip vortices cause _________ drag, which wastes fuel.", answer: "induced", altAnswers: ["Induced", "induced"], exp: "Induced drag is the byproduct of generating lift." },
+            { type: 'match', q: "Match the Winglet fact to its explanation:", pairs: [ { left: "Vertical Barrier", right: "Blocks Air Roll-Over" }, { left: "Fuel Savings", right: "Up to 5%" }, { left: "Boeing 777 Strategy", right: "Longer, flexible wings instead" } ], exp: "Winglets are incredible fuel savers, though some planes just use exceptionally long wings." },
+            { type: 'mcq', q: "Where is high-pressure air naturally trapped on a wing?", options: ["Above the wing", "Inside the cabin", "Under the wing", "In the engines"], answer: 2, exp: "High pressure pushes up from under the wing to create lift." },
+            { type: 'fill-blank', q: "Air rolling over the wingtip creates massive, spinning _________ of air trailing behind the plane.", answer: "vortices", altAnswers: ["Vortices", "vortices", "tornados"], exp: "These are called wingtip vortices." },
+            { type: 'mcq', q: "Why do wingtip vortices slow the plane down?", options: ["They hit the tail", "They create massive induced drag that requires engine energy to overcome", "They freeze the fuel", "They cause turbulence for the passengers"], answer: 1, exp: "Generating these vortices siphons energy from the aircraft's forward momentum." },
+            { type: 'match', q: "Match the drawback to the winglet component:", pairs: [ { left: "Structural Weight", right: "Added mass to the wings" }, { left: "Torsional Stress", right: "Twisting forces applied to the wingtip" } ], exp: "Winglets add weight and twisting forces, which is why short-haul flights sometimes skip them." },
+            { type: 'fill-blank', q: "Some hyper-efficient planes like the Boeing 777 achieve efficiency by making their wings significantly _________ instead of using winglets.", answer: "longer", altAnswers: ["Longer", "longer"], exp: "A longer wingspan reduces the relative size of the tip vortex." },
+            { type: 'mcq', q: "For which type of flight are winglets LEAST effective?", options: ["14-hour international flights", "Extremely short-haul flights", "Medium-haul domestic flights", "Trans-oceanic flights"], answer: 1, exp: "The fuel saved during a brief cruise phase isn't enough to offset the extra weight carried during the climb." },
+            { type: 'mcq', q: "What shape do winglets typically resemble?", options: ["Squares", "Shark-fin like vertical barriers", "Spheres", "Cylinders"], answer: 1, exp: "They sweep upward into graceful vertical barriers." }
+        ]
+    },
+    {
+        id: "primary-flying-controls",
+        title: "Primary Flying Controls",
+        hasVideo: true,
+        videoPlaceholder: "controls_poster.png",
+        textContent: `
+
+            <h2>Primary Flying Controls & Fly-By-Wire</h2>
+            <p>An aircraft moves in a fluid, three-dimensional space around its <span class="physics-term" data-definition="The exact point where the total mass of the aircraft is perfectly balanced.">Center of Gravity</span>. Unlike a car that only turns left and right, pilots must command rotation across three distinct, invisible axes. They achieve this using primary aerodynamic control surfaces located on the trailing edges of the wings and tail.</p>
+
+            <table class="feature-table">
+                <thead>
+                    <tr>
+                        <th>Control Surface</th>
+                        <th>Location</th>
+                        <th>Axis of Rotation</th>
+                        <th>Pilot Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Ailerons</strong></td>
+                        <td>Outer trailing edge of both main wings</td>
+                        <td><span class="physics-term" data-definition="Rotation around the longitudinal (front-to-back) axis, banking the wings.">Roll</span></td>
+                        <td>Turning the control yoke left or right.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Elevators</strong></td>
+                        <td>Horizontal Stabilizer (The mini wings on the tail)</td>
+                        <td><span class="physics-term" data-definition="Rotation around the lateral (side-to-side) axis, pointing the nose up or down.">Pitch</span></td>
+                        <td>Pulling back or pushing forward on the control yoke.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Rudder</strong></td>
+                        <td>Vertical Stabilizer (The upright fin on the tail)</td>
+                        <td><span class="physics-term" data-definition="Rotation around the vertical axis, sweeping the nose left or right.">Yaw</span></td>
+                        <td>Pressing the left or right rudder foot pedals on the floor.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="highlight-box">
+                <h3><i data-lucide="cpu"></i> The Fly-By-Wire Revolution</h3>
+                <p>In older, mechanical planes, the pilot's yoke was literally connected to the distant control surfaces via miles of heavy steel cables, metal pulleys, and rigid pushrods. It was physically exhausting to fly.</p>
+                <p>Modern airliners utilize state-of-the-art <strong>Fly-By-Wire</strong> technology. When the pilot moves the joystick, they are only moving a digital sensor. Supercomputers calculate exactly how much the ailerons or elevators should move based on current airspeed, altitude, and <span class="physics-term" data-definition="The ratio of the speed of the aircraft to the speed of sound in the surrounding air.">Mach Number</span>. The computer then sends electronic light-speed signals to massive hydraulic actuators to physically muscle the surfaces into place. This allows the computer to enforce "flight envelope protection," outright preventing human pilots from making dangerous, aggressive maneuvers that could overstress and snap the wings.</p>
+            </div>
+            
+        `,
+        quiz: [
+            { type: 'mcq', q: "Which control surface controls the 'Pitch' of the aircraft?", options: ["Ailerons", "Rudder", "Elevators", "Flaps"], answer: 2, exp: "Elevators, located on the horizontal stabilizer, control the nose up/down movement." },
+            { type: 'fill-blank', q: "Modern airliners use _________-by-wire technology instead of heavy steel cables.", answer: "fly", altAnswers: ["Fly", "fly by wire", "fly-by-wire"], exp: "Fly-by-wire replaces manual cables with digital computers and electronic signals." },
+            { type: 'match', q: "Match the control surface to its axis:", pairs: [ { left: "Ailerons", right: "Roll" }, { left: "Elevators", right: "Pitch" }, { left: "Rudder", right: "Yaw" } ], exp: "These are the three primary axes of aerodynamic flight." },
+            { type: 'mcq', q: "What pilot action controls Roll via the ailerons?", options: ["Pressing the foot pedals", "Pulling back on the yoke", "Turning the control yoke left or right", "Adjusting the throttle"], answer: 2, exp: "Turning the yoke banks the wings left or right." },
+            { type: 'fill-blank', q: "An aircraft moves in a fluid, three-dimensional space around its Center of _________.", answer: "gravity", altAnswers: ["Gravity", "gravity"], exp: "All three axes of rotation intersect at the Center of Gravity." },
+            { type: 'match', q: "Match the control surface to its location:", pairs: [ { left: "Ailerons", right: "Outer trailing edge of main wings" }, { left: "Elevators", right: "Horizontal Stabilizer" }, { left: "Rudder", right: "Vertical Stabilizer" } ], exp: "Control surfaces are located far from the center of gravity to maximize leverage." },
+            { type: 'mcq', q: "What does the Rudder control?", options: ["Pitch", "Roll", "Speed", "Yaw"], answer: 3, exp: "The rudder sweeps the nose left or right around the vertical axis." },
+            { type: 'fill-blank', q: "In Fly-By-Wire, computers send electronic signals to massive _________ actuators to physically muscle the surfaces.", answer: "hydraulic", altAnswers: ["Hydraulic", "hydraulic"] , exp: "Hydraulic actuators act as the muscles." },
+            { type: 'mcq', q: "What is 'flight envelope protection'?", options: ["A plastic cover for the aircraft", "A computer algorithm preventing pilots from making dangerous maneuvers", "A thermal blanket for the engines", "A type of parachute"], answer: 1, exp: "The fly-by-wire system will override pilot inputs that would overstress or snap the wings." },
+            { type: 'mcq', q: "In older mechanical planes, what connected the pilot's yoke to the control surfaces?", options: ["Wi-Fi", "Bluetooth", "Miles of heavy steel cables and pulleys", "Optical fibers"], answer: 2, exp: "This made flying physically exhausting due to the aerodynamic forces." }
+        ]
+    },
+    {
+        id: "empennage",
+        title: "The Role of the Tailplane / Empennage",
+        hasVideo: true,
+        videoPlaceholder: "tail_poster.png",
+        textContent: `
+
+            <h2>The Role of the Tailplane (Empennage)</h2>
+            <p>The empennage is the entire, complex tail assembly of the aircraft. It is the silent guardian of the sky. Without it, the airplane would be completely aerodynamically unstable. The nose would violently whip around, and the aircraft would tumble uncontrollably through the sky like a leaf caught in a hurricane.</p>
+
+            <div class="content-grid">
+                <div class="glass-panel">
+                    <h3><i data-lucide="arrow-up-circle"></i> The Vertical Stabilizer</h3>
+                    <p>This is the massive upright fin towering at the rear of the tail. It acts exactly like the feathers on the back of an arrow or a rooftop weather vane. By providing a large surface area behind the center of gravity, the rushing air forcefully keeps the nose pointed directly straight into the relative wind, preventing the aircraft from uncontrollably swinging side-to-side (a deadly phenomenon known as <span class="physics-term" data-definition="A coupled rolling and yawing motion that can quickly become uncontrollable.">Dutch Roll</span>).</p>
+                </div>
+                <div class="glass-panel">
+                    <h3><i data-lucide="arrow-right-circle"></i> The Horizontal Stabilizer</h3>
+                    <p>These are the mini-wings jutting out horizontally from the tail. Curiously, on almost all modern airliners, they generate <strong>downward</strong> force, not upward lift! Because the aircraft's incredibly heavy center of gravity (engines, fuel, cargo) is located slightly in front of the main wings' center of lift, the nose naturally wants to pitch down and dive towards the earth. The horizontal stabilizer acts as an aerodynamic see-saw, constantly pushing the tail down to keep the massive plane perfectly balanced and level in flight.</p>
+                </div>
+            </div>
+            
+        `,
+        quiz: [
+            { type: 'mcq', q: "What is the entire tail assembly called?", options: ["Fuselage", "Empennage", "Nacelle", "Aileron"], answer: 1, exp: "The empennage consists of the vertical and horizontal stabilizers." },
+            { type: 'fill-blank', q: "The Horizontal Stabilizer usually generates _________ force, not upward lift.", answer: "downward", altAnswers: ["Downward", "down"], exp: "Because the plane is nose-heavy, the tail must push down to keep it level." },
+            { type: 'match', q: "Match the Empennage component to its function:", pairs: [ { left: "Vertical Fin", right: "Prevents Yaw (Dutch Roll)" }, { left: "Horizontal Mini-Wings", right: "Prevents Pitching Dive" } ], exp: "The tail acts exactly like the feathers on an arrow." },
+            { type: 'mcq', q: "What happens if an aircraft loses its Horizontal Stabilizer?", options: ["It flies faster", "The nose will pitch down into an unrecoverable dive", "It turns left", "Nothing"], answer: 1, exp: "The downward force of the tail is required to counteract the heavy nose." },
+            { type: 'fill-blank', q: "The vertical fin acts like a giant _________ vane to keep the nose pointed into the wind.", answer: "weather", altAnswers: ["Weather", "weather"], exp: "It automatically corrects side-to-side slipping." },
+            { type: 'match', q: "Match the Stabilizer to the control surface attached to it:", pairs: [ { left: "Vertical Stabilizer", right: "Rudder" }, { left: "Horizontal Stabilizer", right: "Elevator" } ], exp: "The stabilizers are the fixed portions; the control surfaces are the moving flaps attached to them." },
+            { type: 'mcq', q: "Why is the center of gravity placed slightly ahead of the main wings?", options: ["To make the plane look better", "For natural stall recovery stability", "To save fuel", "Because the engines are heavy"], answer: 1, exp: "A nose-heavy plane will naturally pitch down to regain speed if it stalls." },
+            { type: 'fill-blank', q: "The side-to-side swinging motion prevented by the vertical stabilizer is called _________ roll.", answer: "dutch", altAnswers: ["Dutch", "dutch", "Dutch roll"] , exp: "Dutch roll is an uncomfortable combination of rolling and yawing." },
+            { type: 'mcq', q: "What part of an arrow functions exactly like the aircraft's empennage?", options: ["The broadhead", "The wooden shaft", "The fletching (feathers)", "The bowstring"], answer: 2, exp: "The feathers create drag at the rear, keeping the heavy tip pointed forward." },
+            { type: 'mcq', q: "Is the empennage primarily for generating lift?", options: ["Yes, it lifts the heavy tail", "No, it primarily provides stability and control leverage", "Yes, it replaces the main wings at high altitude", "No, it generates forward thrust"], answer: 1, exp: "It acts as a stabilizing lever arm, not a primary lifting surface." }
+        ]
+    },
+    {
+        id: "landing-gear-and-brakes",
+        title: "Landing Gear and Brakes",
+        hasVideo: true,
+        videoPlaceholder: "gear_poster.png",
+        textContent: `
+
+            <h2>Landing Gear and Carbon Brakes</h2>
+            <p>The landing gear is the only part of the aircraft that physically touches the earth. It must support the entire static weight of the aircraft—sometimes over a million pounds for a massive A380—while absorbing the immense, punishing kinetic energy of landing on concrete at high speeds.</p>
+
+            <div class="content-grid">
+                <div class="glass-panel">
+                    <h3><i data-lucide="anchor"></i> Oleo Shock Struts</h3>
+                    <p>The main titanium legs of the landing gear. They are essentially massive, highly engineered hydraulic shock absorbers called <span class="physics-term" data-definition="A shock absorber used on aircraft landing gear utilizing compressed air and hydraulic fluid.">Oleo-Pneumatic Struts</span>. Filled with specialized hydraulic fluid and highly compressed nitrogen gas, they cushion the brutal vertical impact of landing, preventing the structural frame of the wing from snapping under the <span class="physics-term" data-definition="Forces that push or squeeze a material, reducing its volume.">Compressive Stress</span>.</p>
+                </div>
+                <div class="glass-panel">
+                    <h3><i data-lucide="circle-dashed"></i> Wheels and Bogies</h3>
+                    <p>Large commercial airliners use a multi-wheel "bogie" (a cart-like structure) on each main gear strut. This is strictly designed to distribute the immense, crushing weight over a significantly larger surface area of the runway, dramatically reducing the <span class="physics-term" data-definition="The pressure exerted by the aircraft tires on the runway surface.">Pavement Loading</span> and preventing the aircraft from literally sinking into the asphalt.</p>
+                </div>
+                <div class="glass-panel">
+                    <h3><i data-lucide="disc"></i> Carbon-Carbon Brakes</h3>
+                    <p>Airplane brakes must bring hundreds of tons of metal moving at 160+ MPH to a dead stop in seconds. Modern airliners use stacks of high-tech <span class="physics-term" data-definition="A composite material consisting of carbon fiber reinforcement in a matrix of graphite.">Carbon-Carbon Composite</span> brake discs. They are incredibly light and can absorb and dissipate massive amounts of thermal energy, frequently glowing bright orange (over 1,000°C) during heavy, aggressive braking scenarios.</p>
+                </div>
+            </div>
+
+            <div class="highlight-box">
+                <h3><i data-lucide="shield-alert"></i> Anti-Skid Systems & Hydroplaning</h3>
+                <p>If a pilot slams on the brakes at 150 MPH, the massive rubber wheels would instantly lock up. The intense friction would cause the tires to explode, leading to a catastrophic loss of directional control. Furthermore, on wet runways, the locked tires would ride on a thin layer of water, a dangerous condition known as <span class="physics-term" data-definition="When a layer of water builds between the wheels and the road surface, leading to a loss of traction.">Dynamic Hydroplaning</span>. Aircraft feature hyper-fast, computerized <span class="physics-term" data-definition="An electronic system that prevents wheel lockup during braking.">Anti-Skid</span> networks that sense when a wheel is about to stop spinning, and instantly release and re-apply hydraulic brake pressure multiple times a millisecond—much like ABS in a car, but immensely more powerful and precise.</p>
+            </div>
+            
+        `,
+        quiz: [
+            { type: 'mcq', q: "What type of brakes do modern airliners typically use?", options: ["Steel Drum Brakes", "Carbon-Carbon Composite Discs", "Hydraulic Parachutes", "Magnetic Brakes"], answer: 1, exp: "Carbon-carbon discs are incredibly light and can absorb massive amounts of thermal energy without melting." },
+            { type: 'fill-blank', q: "Landing gear struts use highly compressed _________ gas alongside hydraulic fluid to absorb shock.", answer: "nitrogen", altAnswers: ["Nitrogen", "nitrogen"], exp: "Nitrogen gas acts as a powerful pneumatic spring to cushion the impact." },
+            { type: 'match', q: "Match the Landing Gear component to its function:", pairs: [ { left: "Oleo Struts", right: "Absorb vertical impact" }, { left: "Bogies", right: "Distribute aircraft weight" }, { left: "Anti-Skid System", right: "Prevents wheel lockup" } ], exp: "Each component plays a critical role in safely returning the aircraft to the ground." },
+            { type: 'mcq', q: "What is the main advantage of Carbon-Carbon brakes over steel brakes?", options: ["They look shinier", "They are significantly lighter and absorb heat better", "They are much cheaper to produce", "They last forever without wear"], answer: 1, exp: "Weight savings translates directly to fuel savings, and they handle extreme temperatures safely." },
+            { type: 'fill-blank', q: "The multi-wheel truck assemblies that distribute the massive weight of the aircraft over runway tarmac are called _________.", answer: "bogies", altAnswers: ["Bogies", "bogies"] , exp: "Bogies prevent the aircraft from sinking into the concrete." },
+            { type: 'match', q: "Match the braking system to its automotive equivalent:", pairs: [ { left: "Aircraft Anti-Skid System", right: "Car ABS (Anti-lock Braking System)" }, { left: "Carbon-Carbon Discs", right: "F1 Racing Car Brakes" } ], exp: "Aerospace technology often shares roots with high-performance automotive tech." },
+            { type: 'mcq', q: "How many times per second can the anti-skid system modulate brake pressure?", options: ["Once a minute", "10 times per second", "Over 1000 times per second", "It cannot modulate"], answer: 2, exp: "Microprocessors detect wheel slip and adjust hydraulic pressure instantaneously to prevent a blown tire." },
+            { type: 'fill-blank', q: "The heavy-duty shock absorbers in the landing gear are called _________ struts.", answer: "oleo", altAnswers: ["Oleo", "oleo", "oleo-pneumatic"], exp: "Oleo struts use a mix of oil (hydraulic fluid) and compressed nitrogen gas." },
+            { type: 'mcq', q: "What happens if the landing gear fails to retract after takeoff?", options: ["The flight continues normally", "Massive aerodynamic drag is created, burning excess fuel", "The plane instantly stalls", "The engines shut down"], answer: 1, exp: "Landing gear is not aerodynamic; leaving it down ruins fuel efficiency." },
+            { type: 'mcq', q: "Why is Nitrogen used in Oleo struts instead of compressed air?", options: ["It is cheaper", "It is inert and won't explode under extreme pressure or heat", "It makes the plane lighter", "It is a liquid"], answer: 1, exp: "Normal air contains oxygen which can ignite under high pressure; nitrogen is safe." }
+        ]
+    }
+);
+
+</script>
+    <script>
+window.courseData.push(
+    {
+        id: "function-gear-brakes",
+        title: "Primary Function of Landing Gear & Brakes",
+        hasVideo: false,
+        textContent: `
+
+            <h2>Function of Gear & Brakes: The Thermodynamics of Stopping</h2>
+            <p>Landing a massive aircraft is fundamentally an exercise in extreme energy management. An aircraft in flight possesses a terrifying amount of <span class="physics-term" data-definition="The energy an object possesses due to its motion (1/2 mass * velocity^2).">Kinetic Energy</span>. To stop safely before running out of runway, the fundamental laws of thermodynamics dictate that this energy cannot be destroyed—it must be violently converted into another form.</p>
+
+            <table class="feature-table">
+                <thead>
+                    <tr>
+                        <th>Energy State</th>
+                        <th>Component Responsible</th>
+                        <th>How Energy is Converted</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Vertical Kinetic Energy</strong> (Falling out of the sky at 500+ feet per minute)</td>
+                        <td>Landing Gear Struts</td>
+                        <td>Converted to Heat. The hydraulic fluid is forcefully pushed through tiny, restrictive <span class="physics-term" data-definition="A precisely sized hole used to control the flow rate of fluid.">Metering Orifices</span> inside the strut, converting the downward smash into thermal energy and smooth compression.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Horizontal Kinetic Energy</strong> (Moving forward down the runway at 160 MPH)</td>
+                        <td>Carbon Brakes & Thrust Reversers</td>
+                        <td>Converted to Extreme Heat. The carbon brake discs use immense, clamping <span class="physics-term" data-definition="The resistance that one surface or object encounters when moving over another.">Friction</span> to convert forward momentum into massive amounts of thermal radiation. Simultaneously, Thrust Reversers open to push engine exhaust forward, using <span class="physics-term" data-definition="Aerodynamic drag intentionally created to slow the aircraft.">Aerodynamic Braking</span>.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="highlight-box">
+                <h3><i data-lucide="flame"></i> The Ultimate Test: RTO (Rejected Takeoff)</h3>
+                <p>The single most demanding, terrifying scenario for an aircraft braking system is a <strong>Rejected Takeoff (RTO)</strong> at maximum gross weight, initiated just milliseconds before the plane lifts off the ground. In this extreme emergency, the carbon brakes must single-handedly absorb the titanic energy required to stop a fully fueled, fully loaded aircraft without the aid of aerodynamic drag. The carbon discs will glow white-hot and the tires may intentionally deflate (via melting <span class="physics-term" data-definition="A safety plug in the wheel rim that melts at high temperatures to safely deflate the tire.">Thermal Fuse Plugs</span>) to prevent a violent, shrapnel-producing explosion from the intense expanding gas.</p>
+            </div>
+            
+        `,
+        quiz: [
+            { type: 'mcq', q: "Landing an aircraft is an exercise in extreme energy management. What type of energy must be destroyed?", options: ["Potential Energy", "Kinetic Energy", "Chemical Energy", "Nuclear Energy"], answer: 1, exp: "The massive kinetic energy (motion) must be converted into heat to safely stop." },
+            { type: 'fill-blank', q: "During an RTO (Rejected Takeoff), carbon brakes may glow red-hot and intentionally melt the _________ fuse plugs in the tires.", answer: "thermal", altAnswers: ["Thermal", "thermal"], exp: "Thermal fuse plugs intentionally deflate the tires to prevent an explosion from the expanding hot gas." },
+            { type: 'match', q: "Match the energy state to how it is handled:", pairs: [ { left: "Vertical Kinetic Energy (Falling)", right: "Absorbed by Strut Fluid" }, { left: "Horizontal Kinetic Energy (Rolling)", right: "Converted to Heat by Brakes" }, { left: "Rejected Takeoff Energy", right: "Absorbed by Brakes Only" } ], exp: "Energy cannot be destroyed, only converted or absorbed." },
+            { type: 'mcq', q: "What does RTO stand for in aviation?", options: ["Ready To Operate", "Rejected Takeoff", "Right Turn Only", "Rotational Thrust Output"], answer: 1, exp: "An RTO occurs when pilots abort the takeoff run at high speeds." },
+            { type: 'fill-blank', q: "When brakes convert kinetic energy into thermal energy, the carbon discs can glow _________ hot.", answer: "red", altAnswers: ["Red", "red", "white"], exp: "The temperatures can exceed 1000 degrees Celsius during an emergency stop." },
+            { type: 'match', q: "Match the stopping mechanism to its source:", pairs: [ { left: "Wheel Brakes", right: "Carbon Discs in Landing Gear" }, { left: "Thrust Reversers", right: "Engine Exhaust Deflectors" }, { left: "Spoilers", right: "Wing Panels that destroy lift" } ], exp: "It takes a combination of systems to stop a 400-ton aircraft." },
+            { type: 'mcq', q: "Why do the tires have thermal fuse plugs?", options: ["To make them look shiny", "To safely release air pressure before the tire explodes from brake heat", "To measure speed", "To hold the rubber together"], answer: 1, exp: "A tire explosion can rip apart the wing structure and fuel tanks." },
+            { type: 'fill-blank', q: "During a rejected takeoff, thrust _________ are used to deflect engine exhaust forward to help stop the plane.", answer: "reversers", altAnswers: ["Reversers", "reversers", "reverser"], exp: "Thrust reversers take the immense power of the engine and use it for braking." },
+            { type: 'mcq', q: "What is the primary function of wing spoilers during landing?", options: ["To look cool for passengers", "To instantly destroy aerodynamic lift and firmly plant the wheels onto the runway", "To generate more thrust", "To cool the brakes"], answer: 1, exp: "If the wings are still lifting, the wheel brakes have no traction." },
+            { type: 'mcq', q: "Can an aircraft brake purely using thrust reversers?", options: ["Yes, that is the primary method", "No, wheel brakes absorb over 80% of the kinetic energy", "Yes, but it takes 10 miles", "No, thrust reversers are a myth"], answer: 1, exp: "Thrust reversers assist, but the carbon wheel brakes do the vast majority of the stopping." }
+        ]
+    },
+    {
+        id: "pressurization",
+        title: "Pressurization & Air Conditioning",
+        hasVideo: true,
+        videoPlaceholder: "pressurization_poster.png",
+        textContent: `
+
+            <h2>The Pressurization System: Surviving the Stratosphere</h2>
+            <p>At an airliner's cruising altitude of 35,000 feet, the outside environment is instantly lethal. The air pressure is a mere 25% of what it is at sea level, the temperature plummets to -60°F (-50°C), and there is so little oxygen that a human would suffer <span class="physics-term" data-definition="A condition in which the body or a region of the body is deprived of adequate oxygen supply.">Hypoxia</span> and lose consciousness in under 30 seconds. To survive, the aircraft must act as a sealed, highly regulated titanium pressure vessel.</p>
+
+            <div class="content-grid">
+                <div class="glass-panel">
+                    <h3><i data-lucide="wind"></i> Bleed Air & The Packs</h3>
+                    <p>To pressurize the vast interior cabin, the aircraft taps (or "bleeds") high-pressure, scorching hot air directly from the spinning compressor stages of the jet engines. This <span class="physics-term" data-definition="Compressed air taken from the engine compressor stage before fuel is injected.">Bleed Air</span> is nearly 400°C. It is immediately routed through powerful Air Conditioning PACKs (Pneumatic Air Conditioning Kits) which use complex air-cycle machines to cool it down to a comfortable 70°F before violently pumping it into the passenger cabin.</p>
+                </div>
+                <div class="glass-panel">
+                    <h3><i data-lucide="activity"></i> The Outflow Valve</h3>
+                    <p>The cabin is continuously pumped full of fresh, pressurized air. To prevent the fuselage from literally popping like a balloon, an automated, motorized <strong>Outflow Valve</strong> at the rear of the plane constantly modulates—opening and closing slightly—letting a highly controlled amount of air escape back into the atmosphere. It's exactly like inflating a balloon that has a controllable leak.</p>
+                </div>
+            </div>
+
+            <div class="highlight-box">
+                <h3><i data-lucide="mountain"></i> Cabin Altitude vs. Physical Altitude</h3>
+                <p>Even though the plane is physically flying through the lethal thin air at 35,000 feet, the dense pressure inside the cabin is artificially maintained at an equivalent of 6,000 to 8,000 feet (this is referred to as the <span class="physics-term" data-definition="The equivalent altitude of the air pressure inside the aircraft.">Cabin Altitude</span>). If a window breaks or the hull is breached, the high-pressure cabin air instantly and violently escapes into the low-pressure outside atmosphere—a terrifying event known as an <span class="physics-term" data-definition="A rapid drop in cabin pressure caused by structural failure.">Explosive Decompression</span>, which causes the immediate deployment of oxygen masks.</p>
+            </div>
+            
+        `,
+        quiz: [
+            { type: 'mcq', q: "How does an aircraft pressurize its cabin at 35,000 feet?", options: ["By carrying giant tanks of compressed air", "By sucking air through the windows", "By tapping high-pressure 'Bleed Air' from the engines", "By spinning a fan in the cabin"], answer: 2, exp: "Hot bleed air is taken from the engine compressor, cooled, and pumped into the cabin." },
+            { type: 'fill-blank', q: "To regulate cabin pressure, an automated _________ Valve constantly modulates to let air escape.", answer: "outflow", altAnswers: ["Outflow", "outflow"], exp: "The Outflow Valve acts like a controlled leak in a balloon." },
+            { type: 'match', q: "Match the pressurization term to its definition:", pairs: [ { left: "Bleed Air", right: "Hot air tapped from the engine" }, { left: "Cabin Altitude", right: "The equivalent pressure inside the cabin" }, { left: "Hypoxia", right: "Loss of consciousness due to low oxygen" } ], exp: "These concepts are critical for surviving the stratosphere." },
+            { type: 'mcq', q: "At 35,000 feet, what is the typical 'Cabin Altitude' maintained by the pressurization system?", options: ["Sea level (0 feet)", "6,000 to 8,000 feet", "35,000 feet", "Subterranean pressure"], answer: 1, exp: "Maintaining sea level pressure would require a fuselage so thick the plane would be too heavy to fly." },
+            { type: 'fill-blank', q: "The fuselage expands and contracts slightly during every flight, a process known as _________ loading.", answer: "cyclic", altAnswers: ["Cyclic", "cyclic", "fatigue"], exp: "This repeated stretching creates metal fatigue over thousands of flights." },
+            { type: 'match', q: "Match the atmospheric effect to the altitude:", pairs: [ { left: "Sea Level", right: "Dense air, high oxygen" }, { left: "35,000 Feet", right: "Lethally thin air, freezing temperatures" }, { left: "8,000 Feet Cabin Altitude", right: "Comfortable breathing equivalent to a mountain town" } ], exp: "The ECS creates an artificial habitable zone." },
+            { type: 'mcq', q: "What happens to the hot Bleed Air before it enters the cabin?", options: ["It is sprayed with water", "It is sent through the Air Cycle Machine (ACM) to be aggressively cooled", "It is mixed with jet fuel", "It is sent to the tail"], answer: 1, exp: "Bleed air is hundreds of degrees; the ACM (aircraft AC unit) cools it down." },
+            { type: 'fill-blank', q: "If the Outflow Valve gets stuck fully closed, the cabin will over-_________ and pop like a balloon.", answer: "pressurize", altAnswers: ["Pressurize", "pressurize"], exp: "Positive pressure relief valves automatically open to prevent catastrophic structural failure." },
+            { type: 'mcq', q: "Why do passengers' ears pop during descent?", options: ["Engine noise", "The cabin pressure is changing to match the heavier ground-level air pressure", "The pilot pressed a button", "Radio interference"], answer: 1, exp: "The outflow valve gradually allows pressure to increase as the plane descends." },
+            { type: 'mcq', q: "If explosive decompression occurs, how many seconds of 'Useful Consciousness' do pilots have at 40,000 ft?", options: ["1 hour", "5 minutes", "10 to 15 seconds", "Zero"], answer: 2, exp: "Hypoxia sets in almost instantly; they must don oxygen masks immediately." }
+        ]
+    },
+    {
+        id: "airplane-engines",
+        animationType: "engine",
+        title: "Airplane Engines",
+        hasVideo: true,
+        videoPlaceholder: "engines_poster.png",
+        textContent: `
+
+            <h2>Airplane Engines: Turbines vs. Pistons</h2>
+            <p>Aircraft engines are the beating heart of aviation. They fall into two primary mechanical categories based on exactly how they convert chemical energy (fuel) into mechanical energy (thrust). Both rely on the violent combustion of fossil fuels, but their internal mechanics and physics are entirely different paradigms.</p>
+
+            <table class="feature-table">
+                <thead>
+                    <tr>
+                        <th>Engine Category</th>
+                        <th>Core Mechanism</th>
+                        <th>Best Use Case & Physics</th>
+                        <th>Example Aircraft</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Piston (Reciprocating) Engine</strong></td>
+                        <td>Uses enclosed cylinders and reciprocating pistons (exactly like a Honda Civic) to spin a crankshaft attached to a propeller.</td>
+                        <td>Low altitude, slow speed. Highly susceptible to <span class="physics-term" data-definition="A decrease in engine power due to lower air density at high altitudes.">Altitude Power Loss</span> because thinner air provides less oxygen for combustion.</td>
+                        <td>Cessna 172, Piper Archer.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Turboprop Engine</strong></td>
+                        <td>Uses a continuous-combustion jet engine core, but instead of shooting thrust out the back, it uses the exhaust gas to spin a massive turbine connected to a complex <span class="physics-term" data-definition="A mechanical system that reduces the high RPM of the jet core to a lower, usable RPM for the propeller.">Reduction Gearbox</span>, which spins a massive propeller.</td>
+                        <td>Medium altitude, medium speed. Phenomenal at generating immediate, massive thrust for extremely short runways.</td>
+                        <td>ATR 72, Bombardier Dash 8.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>High-Bypass Turbofan (Jet)</strong></td>
+                        <td>Uses a jet core to spin a titanic titanium fan at the very front. The vast majority of the air blown by this fan goes <em>around</em> the burning core, bypassing it entirely.</td>
+                        <td>High altitude, high subsonic speed (Mach 0.85). Incredibly fuel-efficient at altitude and drastically quieter than older jets.</td>
+                        <td>Boeing 777, Airbus A350.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="highlight-box">
+                <h3><i data-lucide="plane"></i> Why Turbofans Dominate the Skies</h3>
+                <p>Pure turbojets (which shoot 100% of their superheated exhaust out the back as a high-speed jet of fire, like a military fighter jet or the Concorde) are incredibly loud, violent, and highly fuel-inefficient at subsonic speeds. Modern commercial airliners exclusively use <strong>High-Bypass Turbofans</strong>. Because 80% of the cold air propelled by the massive front fan bypasses the explosive core entirely, it creates a thick "blanket" of cold, slow air wrapping around the ultra-fast, screaming hot exhaust jet. This cold blanket acts as a natural muffler, drastically reducing noise pollution while providing massive, efficient thrust.</p>
+            </div>
+            
+        `,
+        quiz: [
+            { type: 'mcq', q: "What type of engine is used on almost all modern commercial airliners?", options: ["Piston Engine", "High-Bypass Turbofan", "Turbojet", "Scramjet"], answer: 1, exp: "High-Bypass Turbofans are incredibly efficient and significantly quieter than older turbojets." },
+            { type: 'fill-blank', q: "In a turbofan engine, the vast majority of the air propelled by the front fan _________ the burning core entirely.", answer: "bypasses", altAnswers: ["Bypasses", "bypasses", "bypass"], exp: "This bypass air provides the majority of the thrust and creates a cold, quiet blanket around the hot exhaust jet." },
+            { type: 'match', q: "Match the engine type to its best use case:", pairs: [ { left: "Piston Engine", right: "Low altitude, slow speed Cessna" }, { left: "Turboprop", right: "Medium altitude, short runway Commuters" }, { left: "Turbofan", right: "High altitude, high subsonic speed Airliners" } ], exp: "Different engines use different aerodynamic properties." },
+            { type: 'mcq', q: "What percentage of thrust is typically generated by the massive front fan in a modern turbofan?", options: ["10%", "50%", "Up to 80%", "100%"], answer: 2, exp: "The core jet engine mainly exists just to spin the massive fan, which acts like a giant enclosed propeller." },
+            { type: 'fill-blank', q: "The 'Bypass _________' is a metric comparing the amount of air bypassing the core vs entering the core.", answer: "ratio", altAnswers: ["Ratio", "ratio"], exp: "A high bypass ratio (like 10:1) means 10 times more air bypasses the core than enters it." },
+            { type: 'match', q: "Match the component to its characteristic:", pairs: [ { left: "Front Fan Blades", right: "Made of hollow titanium, sweeping massive air" }, { left: "Engine Core", right: "Screaming hot, burns jet fuel" }, { left: "Cowling (Nacelle)", right: "Aerodynamic housing reducing drag" } ], exp: "Every part of the engine is highly specialized." },
+            { type: 'mcq', q: "Why are high-bypass turbofans quieter than older turbojets?", options: ["They have mufflers", "The cold bypass air wraps around the screaming hot exhaust, dampening the shear noise", "They burn less fuel", "They spin slower"], answer: 1, exp: "The mixing of cold and hot air dramatically reduces the acoustic shockwave." },
+            { type: 'fill-blank', q: "Older fighter jets and the Concorde used pure _________ engines, where 100% of the air goes through the fiery core.", answer: "turbojet", altAnswers: ["Turbojet", "turbojet", "turbojets"], exp: "Turbojets are extremely loud and fuel-thirsty but great for supersonic speeds." },
+            { type: 'mcq', q: "What happens if a bird strikes the front fan?", options: ["The plane instantly explodes", "The fan blades are designed to shred the bird and often continue operating safely", "The engines shut off automatically", "The pilots must eject"], answer: 1, exp: "Engines undergo extreme testing, including firing frozen birds into them at high speeds." },
+            { type: 'mcq', q: "What powers the accessories like electrical generators and hydraulic pumps?", options: ["Windmills", "An Accessory Gearbox connected to the spinning engine shaft", "Batteries", "Solar panels"], answer: 1, exp: "The immense rotational energy of the engine core is tapped to power the aircraft's systems." }
+        ]
+    }
+);
+
+</script>
+    <script>
+window.courseData.push(
+    {
+        id: "jet-thrust",
+        title: "How do jet engines produce thrust?",
+        hasVideo: false,
+        textContent: `
+
+            <h2>How Jet Engines Produce Thrust: The Brayton Cycle</h2>
+            <p>A modern turbofan jet engine is essentially a continuous, highly controlled explosion tube. Unlike a car engine which pulses in distinct, separate strokes, a jet engine operates continuously on the <span class="physics-term" data-definition="A thermodynamic cycle describing the workings of a constant-pressure heat engine.">Brayton Thermodynamic Cycle</span>, which aviation engineers affectionately summarize in four words: <em>Suck, Squeeze, Bang, Blow.</em></p>
+
+            <div class="content-grid">
+                <div class="glass-panel">
+                    <h3><i data-lucide="fan"></i> 1. Suck (Intake)</h3>
+                    <p>The massive, curved titanium fan blades at the front of the engine suck in literally tons of dense, cold atmospheric air every single second.</p>
+                </div>
+                <div class="glass-panel">
+                    <h3><i data-lucide="minimize-2"></i> 2. Squeeze (Compression)</h3>
+                    <p>The air enters the core compressor—a long series of rapidly spinning blades that get progressively smaller and tighter. This violently forces the air into a tiny space, raising its pressure immensely and causing its temperature to spike (up to 400°C) simply from the extreme <span class="physics-term" data-definition="The heating of a gas when it is compressed without heat being added.">Adiabatic Compression</span>.</p>
+                </div>
+                <div class="glass-panel">
+                    <h3><i data-lucide="flame"></i> 3. Bang (Combustion)</h3>
+                    <p>Highly refined Jet-A fuel is finely atomized and sprayed directly into this highly compressed, scorching air inside the combustion chamber and ignited. The continuous, infernal explosion expands the gases violently.</p>
+                </div>
+                <div class="glass-panel">
+                    <h3><i data-lucide="wind"></i> 4. Blow (Exhaust)</h3>
+                    <p>The rapidly expanding, superheated gas shoots out the back. But before it escapes, it passes through the <strong>Turbine Section</strong>, crashing into blades and spinning them at incredible speeds. The turbine is physically connected by a long metal shaft straight through the engine to the front fan and compressor, mechanically forcing them to keep spinning and sucking in more air, keeping the whole violent cycle running endlessly.</p>
+                </div>
+            </div>
+
+            <div class="highlight-box">
+                <h3><i data-lucide="fast-forward"></i> Newton's Application & Thrust</h3>
+                <p>According to Newton's Third Law of Motion, the massive, concentrated force of the hot exhaust gases (and the cold bypass air) blasting violently out the back of the engine creates an equal, opposite, and unstoppable physical force that pushes the massive engine (and the heavy airplane attached to it) forward through the sky. This raw physical pushing power is known as <span class="physics-term" data-definition="The forward force produced by the powerplant.">Aerodynamic Thrust</span>.</p>
+            </div>
+            
+        `,
+        quiz: [
+            { type: 'mcq', q: "What extracts energy from the hot exhaust gas to drive the compressor at the front?", options: ["The Fan", "The Combustor", "The Turbine", "The Nozzle"], answer: 2, exp: "The hot expanding gases spin the rear turbine, which is physically connected by a shaft to the front compressor." },
+            { type: 'fill-blank', q: "According to Newton's Third Law, the massive force of exhaust blasting backwards creates a forward force called _________.", answer: "thrust", altAnswers: ["Thrust", "thrust"], exp: "Thrust is the raw physical pushing power generated by the engine." },
+            { type: 'match', q: "Match the step of the Brayton Cycle to its aviation nickname:", pairs: [ { left: "Intake", right: "Suck" }, { left: "Compression", right: "Squeeze" }, { left: "Combustion", right: "Bang" }, { left: "Exhaust", right: "Blow" } ], exp: "Suck, Squeeze, Bang, Blow elegantly summarizes continuous jet combustion." },
+            { type: 'mcq', q: "What is the primary function of the combustor?", options: ["To compress air", "To mix high-pressure air with fuel and ignite it continuously", "To steer the aircraft", "To cool the engine"], answer: 1, exp: "It acts as a continuous blowtorch." },
+            { type: 'fill-blank', q: "The _________ section of the engine contains thousands of tiny airfoils that spin to squeeze the air to incredibly high pressures.", answer: "compressor", altAnswers: ["Compressor", "compressor"], exp: "Compression is required to make the fuel burn efficiently." },
+            { type: 'match', q: "Match the component to its thermal environment:", pairs: [ { left: "Compressor Blades", right: "Warm to hot (due to squeezing friction)" }, { left: "Combustion Chamber", right: "Inferno (Over 2000 degrees Celsius)" }, { left: "Turbine Blades", right: "Extreme Heat (Requires cooling holes)" } ], exp: "The materials must withstand incredible thermal stress." },
+            { type: 'mcq', q: "How do turbine blades survive being blasted by 2000-degree exhaust when their melting point is lower than that?", options: ["They are covered in ice", "They have tiny laser-drilled holes that bleed cool air over their surface, creating a protective thermal blanket", "They are made of diamond", "They rotate so fast they don't get hot"], answer: 1, exp: "Film cooling is one of the greatest achievements in aerospace metallurgy." },
+            { type: 'fill-blank', q: "Unlike a car engine which operates in distinct strokes, a jet engine operates on a _________ combustion cycle.", answer: "continuous", altAnswers: ["Continuous", "continuous"], exp: "The fire in a jet engine never goes out during flight." },
+            { type: 'mcq', q: "What shapes the exhaust gas to maximize the velocity as it exits the engine?", options: ["The fan", "The exhaust nozzle", "The wing", "The tail"], answer: 1, exp: "The nozzle pinches the airflow, accelerating it to immense speeds." },
+            { type: 'mcq', q: "What happens to the pressure of the air as it passes through the compressor?", options: ["It drops rapidly", "It stays the same", "It increases drastically, sometimes up to 40 times atmospheric pressure", "It turns to liquid"], answer: 2, exp: "Squeezing the air concentrates the oxygen for a more powerful explosion." }
+        ]
+    },
+    {
+        id: "oil-fuel-systems",
+        title: "Oil and Fuel Systems",
+        hasVideo: true,
+        videoPlaceholder: "fuel_poster.png",
+        textContent: `
+
+            <h2>Oil & Fuel Systems: The Lifeblood</h2>
+            <p>Aircraft engines are terrifyingly powerful machines that require two vital fluid systems to survive: Jet Fuel to burn for raw explosive thrust, and highly engineered Synthetic Oil to prevent the engine from violently tearing itself apart through internal mechanical friction.</p>
+
+            <div class="content-grid">
+                <div class="glass-panel">
+                    <h3><i data-lucide="droplet"></i> The Fuel System</h3>
+                    <p>Commercial jet fuel (Jet-A) is essentially highly refined, purified kerosene. Unlike automobiles that store fuel in a thick, dedicated trunk tank, a massive airliner strategically stores its fuel literally inside the hollow, internal structures of the main wings (known as "wet wings"). This keeps the immensely heavy weight of the dense fuel centered directly over the aerodynamic source of lift, dramatically reducing the structural <span class="physics-term" data-definition="The stress caused by bending moments applied to a structural element.">Bending Stress</span> on the wing roots where they attach to the fuselage.</p>
+                </div>
+                <div class="glass-panel">
+                    <h3><i data-lucide="activity"></i> The Oil System</h3>
+                    <p>Turbofan engine cores spin at tens of thousands of RPMs. Without flawless, uninterrupted lubrication, the heavy metal bearings would melt from extreme <span class="physics-term" data-definition="The resistance that one surface or object encounters when moving over another.">Friction</span> in a matter of seconds, seizing the engine instantly. Aviation oil is highly synthetic, chemically engineered to withstand infernal temperatures without breaking down, losing its <span class="physics-term" data-definition="A measure of a fluid's resistance to gradual deformation by shear stress or tensile stress.">Viscosity</span>, or catching fire.</p>
+                </div>
+            </div>
+
+            <div class="highlight-box">
+                <h3><i data-lucide="thermometer-snowflake"></i> A Genius Exchange of Thermodynamics</h3>
+                <p>At 35,000 feet, the vast quantities of fuel sitting exposed in the thin aluminum wings become dangerously, freezing cold, while the oil churning inside the violently spinning engine gets dangerously, scorching hot. Aircraft engineers elegantly solve both extreme problems using a <span class="physics-term" data-definition="A device built for efficient heat transfer from one medium to another.">Fuel/Oil Heat Exchanger</span>. The scalding hot engine oil is piped immediately past the freezing cold wing fuel. The fuel acts as a <span class="physics-term" data-definition="An environment or object that absorbs and dissipates heat.">Heat Sink</span>, absorbing the thermal energy. This heavily warms up the fuel (ensuring ice crystals don't form and clog the fuel filters) and simultaneously rapidly cools down the oil in return! It is a masterpiece of thermodynamic recycling.</p>
+            </div>
+            
+        `,
+        quiz: [
+            { type: 'mcq', q: "Where do modern commercial airliners store the vast majority of their jet fuel?", options: ["In the belly cargo hold", "In a large tank behind the cockpit", "Inside the hollow internal structures of the wings", "In external drop tanks"], answer: 2, exp: "Storing fuel in 'wet wings' keeps the heavy weight directly over the source of aerodynamic lift." },
+            { type: 'fill-blank', q: "To solve the extreme temperature problems of both fluids, aircraft use a Fuel/Oil _________ Exchanger.", answer: "heat", altAnswers: ["Heat", "heat"], exp: "The Heat Exchanger uses cold fuel to cool down hot oil, while the hot oil warms up the freezing fuel." },
+            { type: 'match', q: "Match the fluid to its operational challenge at 35,000 feet:", pairs: [ { left: "Jet Fuel in the wings", right: "Becomes dangerously freezing cold" }, { left: "Synthetic Oil in the engine", right: "Becomes scorchingly hot from friction" }, { left: "Fuel/Oil Heat Exchanger", right: "Recycles thermal energy between the two" } ], exp: "Thermodynamic recycling is essential for fluid health." },
+            { type: 'mcq', q: "What happens if jet fuel becomes too cold during a long flight?", options: ["It burns brighter", "It can become slushy and block the fuel filters", "It evaporates", "It generates electricity"], answer: 1, exp: "Wax crystals can form in freezing jet fuel, starving the engines." },
+            { type: 'fill-blank', q: "The oil system is a closed _________ that constantly recirculates synthetic oil.", answer: "loop", altAnswers: ["Loop", "loop"], exp: "Oil is pumped, heated, cooled, filtered, and pumped again." },
+            { type: 'match', q: "Match the fluid to its primary purpose:", pairs: [ { left: "Jet Fuel", right: "Burned to create thrust" }, { left: "Engine Oil", right: "Lubricates and cools bearings" }, { left: "Hydraulic Fluid", right: "Pushes flight controls" } ], exp: "Fluids are the lifeblood of the aircraft." },
+            { type: 'mcq', q: "Why is storing fuel in the wings beneficial for the aircraft structure?", options: ["It relieves upward bending stress on the wing root", "It makes the plane look cooler", "It prevents lightning strikes", "It keeps the cabin warm"], answer: 0, exp: "The weight of the fuel pushes down, counteracting the massive upward lifting force of the wings." },
+            { type: 'fill-blank', q: "Fuel is pumped from the wings to the engines via powerful _________ pumps.", answer: "boost", altAnswers: ["Boost", "boost", "fuel"] , exp: "Boost pumps ensure the engine never starves for fuel." },
+            { type: 'mcq', q: "What type of oil is used in modern jet engines?", options: ["Standard Motor Oil (10W-30)", "Olive Oil", "Highly specialized Synthetic Oil", "Vegetable Oil"], answer: 2, exp: "Standard oil would boil away instantly in a jet engine." },
+            { type: 'mcq', q: "Does the Fuel/Oil Heat Exchanger consume electrical power to heat the fuel?", options: ["Yes, it uses giant electric coils", "No, it uses waste heat passively transferred from the hot oil", "Yes, it burns fuel to make heat", "No, it uses solar power"], answer: 1, exp: "It is a passive thermodynamic exchange." }
+        ]
+    },
+    {
+        id: "monitor-oil-fuel",
+        title: "Why monitor oil & fuel?",
+        hasVideo: false,
+        textContent: `
+
+            <h2>Monitoring Oil & Fuel</h2>
+            <p>Pilots obviously cannot open the hood mid-flight to check an analog oil dipstick. They rely entirely on incredibly advanced digital sensor networks, telemetry data, and massive glass displays in the cockpit to monitor the absolute health of the fluid systems in real-time.</p>
+
+            <table class="feature-table">
+                <thead>
+                    <tr>
+                        <th>Parameter Monitored</th>
+                        <th>Why It Matters</th>
+                        <th>Critical Warning Sign</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Oil Pressure</strong></td>
+                        <td>Ensures highly viscous oil is successfully reaching the high-speed turbine bearings.</td>
+                        <td>A sudden drop in pressure implies a severed hydraulic line, a massive leak, or a failing mechanical pump. Catastrophic engine seizure is imminent.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Oil Temperature</strong></td>
+                        <td>Monitors the internal thermal health and friction levels of the engine core.</td>
+                        <td>A rapidly spiking temperature implies excessive metal-on-metal friction or a completely failed Fuel/Oil <span class="physics-term" data-definition="A device that transfers heat between two fluids without mixing them.">Heat Exchanger</span>.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Fuel Flow</strong></td>
+                        <td>Tracks the exact volume of fuel consumption (measured precisely in pounds or kilograms per hour).</td>
+                        <td>Abnormal flow that doesn't match engine thrust indicates an internal engine blockage or a massive, dangerous external fuel leak.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Fuel Imbalance</strong></td>
+                        <td>Ensures the heavy weight of the fuel is distributed perfectly equally between the left and right wings.</td>
+                        <td>If one wing is significantly heavier, the plane's <span class="physics-term" data-definition="The exact point where the total mass of the aircraft is perfectly balanced.">Center of Gravity</span> shifts, and it will constantly want to roll over, requiring exhausting aerodynamic correction.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="highlight-box">
+                <h3><i data-lucide="monitor"></i> EICAS / ECAM Displays</h3>
+                <p>Instead of walls of confusing analog dials, modern planes use the Engine Indicating and Crew Alerting System (EICAS) or Electronic Centralized Aircraft Monitor (ECAM). These intelligent digital screens automatically monitor thousands of data points. They only highlight parameters in flashing amber or critical red if they deviate from mathematically normal limits, instantly alerting the pilots to an anomaly before it becomes a disaster.</p>
+            </div>
+            
+        `,
+        quiz: [
+            { type: 'mcq', q: "What does a sudden, severe drop in Engine Oil Pressure indicate to a pilot?", options: ["The engine is running highly efficiently", "A catastrophic hydraulic leak or failing pump; engine seizure is imminent", "The fuel is freezing", "The aircraft is flying too fast"], answer: 1, exp: "Without oil pressure, the metal bearings will melt from friction in seconds." },
+            { type: 'fill-blank', q: "Modern cockpits use intelligent digital screens like EICAS or ECAM to track _________ data.", answer: "telemetry", altAnswers: ["Telemetry", "telemetry"], exp: "These digital screens process thousands of data points and only alert pilots to abnormal deviations." },
+            { type: 'match', q: "Match the fluid parameter to the warning sign it indicates:", pairs: [ { left: "Low Oil Pressure", right: "Imminent Engine Seizure" }, { left: "High Oil Temperature", right: "Failed Heat Exchanger" }, { left: "Fuel Imbalance", right: "Dangerous Center of Gravity shift" } ], exp: "Pilots rely on digital telemetry to monitor the lifeblood of the aircraft." },
+            { type: 'mcq', q: "What does a 'Fuel Imbalance' mean?", options: ["The fuel is bad quality", "One wing has significantly more fuel weight than the other", "The plane is flying too high", "The engines are burning oil"], answer: 1, exp: "A heavy wing will cause the plane to constantly try to roll to that side." },
+            { type: 'fill-blank', q: "To fix a fuel imbalance, pilots open a _________-feed valve to route fuel from the heavy wing to the opposite engine.", answer: "cross", altAnswers: ["Cross", "cross"] , exp: "Cross-feeding allows any engine to drink from any tank." },
+            { type: 'match', q: "Match the cockpit system to its function:", pairs: [ { left: "ECAM / EICAS", right: "Engine & Caution Monitoring Screens" }, { left: "Fuel Quantity Indicators", right: "Shows remaining pounds of fuel" }, { left: "Master Warning Light", right: "Flashes red for critical failures" } ], exp: "Modern cockpits consolidate thousands of dials into clean digital screens." },
+            { type: 'mcq', q: "Why do pilots measure fuel in Pounds or Kilograms instead of Gallons?", options: ["Because it sounds cooler", "Because the volume (gallons) shrinks when it gets cold, but the mass (pounds) stays constant", "Because the gauges are old", "Because water is measured in gallons"], answer: 1, exp: "Energy content is tied to mass, not volume." },
+            { type: 'fill-blank', q: "If oil temperature spikes, the _________ might be failing to cool it.", answer: "exchanger", altAnswers: ["Exchanger", "exchanger", "heat exchanger"] , exp: "The Fuel/Oil heat exchanger is responsible for cooling the oil." },
+            { type: 'mcq', q: "What action must a pilot immediately take if an engine completely loses oil pressure?", options: ["Accelerate", "Shut down that engine to prevent it from tearing itself apart", "Pump more fuel into it", "Turn on the wipers"], answer: 1, exp: "A seized engine can throw shrapnel; it must be shut down safely." },
+            { type: 'mcq', q: "Do modern aircraft constantly barrage the pilots with every single telemetry data point?", options: ["Yes, pilots read thousands of numbers constantly", "No, the 'Dark Cockpit' philosophy means screens stay blank unless something is wrong", "Yes, it prints them on paper", "No, the aircraft flies itself completely"], answer: 1, exp: "A dark screen is a happy screen." }
+        ]
+    }
+);
+
+</script>
+    <script>
+window.courseData.push(
+    {
+        id: "hydraulic-pneumatic",
+        title: "Hydraulic and Pneumatic Systems",
+        hasVideo: true,
+        videoPlaceholder: "hydro_poster.png",
+        textContent: `
+
+            <h2>Hydraulic & Pneumatic Systems: Fluid Power</h2>
+            <p>Commercial airplanes are massive, terrifyingly heavy machines moving at near the speed of sound. Human muscles are simply not strong enough to manually push a 2-ton vertical rudder against 500 MPH aerodynamic winds. To solve this, the aircraft relies entirely on fluid dynamics to multiply force.</p>
+
+            <div class="content-grid">
+                <div class="glass-panel">
+                    <h3><i data-lucide="waves"></i> Hydraulics (Liquid Power)</h3>
+                    <p>Because liquids (like specialized Skydrol hydraulic fluid) are physically <span class="physics-term" data-definition="A fluid whose density cannot be changed by squeezing it into a smaller volume.">Incompressible</span>, forcefully pushing fluid into one end of a closed pipe instantly and violently pushes whatever mechanical piston is at the other end. Hydraulics are utilized when immense, rigid, instantaneous, and unrelenting physical power is required (e.g., slamming down the heavy landing gear, crushing the carbon brakes, or holding primary flight controls steady against gale-force winds).</p>
+                </div>
+                <div class="glass-panel">
+                    <h3><i data-lucide="wind"></i> Pneumatics (Gas Power)</h3>
+                    <p>Unlike liquids, gases (like atmospheric air) are highly compressible. They act more like a powerful, elastic spring rather than a solid rod. Pneumatic systems are utilized for aircraft components that require a massive, steady flow of kinetic energy rather than rigid, locking pushing power (e.g., rapidly spinning up the massive jet engine turbines during startup, pumping air conditioning into the cabin, or blowing scorching air over the wings for anti-ice systems).</p>
+                </div>
+            </div>
+            
+        `,
+        quiz: [
+            { type: 'mcq', q: "Why are Hydraulic systems used for heavy-duty tasks like moving flight controls?", options: ["Because liquids are lighter than air", "Because liquids are physically incompressible, allowing immediate transfer of massive force", "Because hydraulic fluid burns easily for thrust", "Because it looks cool"], answer: 1, exp: "Incompressible liquids allow for rigid, immediate, and unrelenting pushing power." },
+            { type: 'fill-blank', q: "Unlike liquids, gases used in Pneumatic systems are highly _________, acting more like an elastic spring.", answer: "compressible", altAnswers: ["Compressible", "compressible"], exp: "Pneumatics provide a steady flow of kinetic energy rather than rigid pushing power." },
+            { type: 'match', q: "Match the fluid dynamic principle to its aircraft application:", pairs: [ { left: "Hydraulics (Incompressible Liquid)", right: "Slamming down heavy landing gear" }, { left: "Pneumatics (Compressible Gas)", right: "Spinning up jet engine turbines" } ], exp: "Hydraulics are the muscles; pneumatics provide the breath." },
+            { type: 'mcq', q: "At what pressure do modern airliner hydraulic systems typically operate?", options: ["50 PSI", "3,000 to 5,000 PSI", "100,000 PSI", "10 PSI"], answer: 1, exp: "This extreme pressure allows small actuators to move massive flight controls." },
+            { type: 'fill-blank', q: "A common synthetic hydraulic fluid used in aviation, known for its purple color and fire resistance, is _________.", answer: "skydrol", altAnswers: ["Skydrol", "skydrol"] , exp: "Skydrol is highly toxic and corrosive to paint, but it won't easily catch fire." },
+            { type: 'match', q: "Match the system to what it primarily powers:", pairs: [ { left: "Hydraulic System", right: "Wheel Brakes & Landing Gear" }, { left: "Pneumatic System", right: "Air Conditioning & Anti-Ice" }, { left: "Electrical System", right: "Avionics & Lighting" } ], exp: "Different power types are suited for different jobs." },
+            { type: 'mcq', q: "Why can't you use pneumatics to operate the wheel brakes?", options: ["Air is too heavy", "Air is compressible, so the brakes would feel 'spongy' and lack instant clamping force", "Air would freeze the brakes", "Air would make them too loud"], answer: 1, exp: "Incompressible liquids guarantee that 1 inch of pedal movement equals immediate clamping force." },
+            { type: 'fill-blank', q: "When pneumatic air is used to melt ice off the wings, it is called the _________-ice system.", answer: "anti", altAnswers: ["Anti", "anti"] , exp: "Hot bleed air is routed through the leading edges of the wings." },
+            { type: 'mcq', q: "How is hydraulic fluid pushed through the lines?", options: ["By gravity", "By Engine-Driven Pumps (EDPs)", "By passenger pedaling", "By wind"], answer: 1, exp: "The spinning engine directly turns a pump to pressurize the fluid." },
+            { type: 'mcq', q: "If a hydraulic line gets severed, what happens?", options: ["The fluid sprays out at high pressure and the system loses all power", "The fluid turns to gas", "The plane explodes", "Nothing happens"], answer: 0, exp: "This is why aircraft have multiple redundant hydraulic systems." }
+        ]
+    },
+    {
+        id: "function-hydro-pneumatic",
+        title: "Main Function of Hydraulic/Pneumatic",
+        hasVideo: false,
+        textContent: `
+
+            <h2>Function of Hydro/Pneumatic Systems</h2>
+            <p>The aircraft uses powerful engine-driven mechanical pumps and spinning compressors to violently pressurize these vital fluid networks, turning the raw chemical energy of burning jet fuel into usable mechanical utility throughout the entire length of the plane.</p>
+
+            <table class="feature-table">
+                <thead>
+                    <tr>
+                        <th>Fluid System Type</th>
+                        <th>Primary Source of Power</th>
+                        <th>Critical Uses on Aircraft</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Hydraulics (3000-5000 PSI)</strong></td>
+                        <td>Engine-Driven Hydraulic Pumps (EDP) attached to the accessory gearbox.</td>
+                        <td>Actuating Ailerons, Elevators, Rudder, extending/retracting heavy Flaps, violently deploying Landing Gear, powering the Wheel Brakes, and allowing Nose Wheel Steering on the ground.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Pneumatics (Bleed Air)</strong></td>
+                        <td>High-pressure air stolen from the Engine Compressor Stages.</td>
+                        <td>Cabin Pressurization, Air Conditioning, Engine Anti-Ice (melting dangerous ice formations on the wings), and physically spinning the engines for the Engine Starting sequence.</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="highlight-box">
+                <h3><i data-lucide="shield-alert"></i> The Law of Triple Redundancy</h3>
+                <p>Because completely losing hydraulic fluid pressure means losing the physical ability to steer the aircraft's control surfaces, large airliners boast three completely separate, physically isolated hydraulic networks (often colored Green, Blue, and Yellow). If a catastrophic engine explosion cuts the Green hydraulic lines, the fluid bleeds out, but the independent Blue and Yellow systems possess enough <span class="physics-term" data-definition="The inclusion of extra components which are not strictly necessary to functioning, in case of failure.">Redundancy</span> to still safely fly and land the airplane.</p>
+            </div>
+            
+        `,
+        quiz: [
+            { type: 'mcq', q: "What is the 'Law of Triple Redundancy' in commercial aircraft hydraulics?", options: ["Every plane must have three pilots", "Having three completely separate hydraulic networks so the plane can still fly if one or two fail", "Using three types of fluid", "Pumping the fluid three times as fast"], answer: 1, exp: "Redundancy ensures that a single point of failure (like a severed line) doesn't cause a crash." },
+            { type: 'fill-blank', q: "Pneumatic systems rely on stealing high-pressure _________ Air from the spinning engine compressors.", answer: "bleed", altAnswers: ["Bleed", "bleed"], exp: "Bleed Air is incredibly hot and pressurized, powering cabin air conditioning and anti-ice systems." },
+            { type: 'match', q: "Match the System to its primary source of power:", pairs: [ { left: "Hydraulics (3000-5000 PSI)", right: "Engine-Driven Hydraulic Pumps (EDP)" }, { left: "Pneumatics", right: "Air stolen from Engine Compressors" } ], exp: "The spinning jet engine powers both the hydraulic and pneumatic networks." },
+            { type: 'mcq', q: "What does the PTU (Power Transfer Unit) do?", options: ["Transfers passengers", "Transfers hydraulic pressure between two separate systems without mixing their fluids", "Pumps fuel", "Generates electricity"], answer: 1, exp: "If System A's pump fails, the PTU uses System B's pressure to power System A's lines." },
+            { type: 'fill-blank', q: "The PTU makes a very loud, distinctive 'barking' _________ sound under the cabin floor when operating.", answer: "dog", altAnswers: ["Dog", "dog"] , exp: "Frequent flyers recognize the 'barking dog' sound during taxiing." },
+            { type: 'match', q: "Match the backup system to its function:", pairs: [ { left: "Engine Driven Pump (EDP)", right: "Primary hydraulic source" }, { left: "Electric Motor Pump (EMP)", right: "Secondary hydraulic source" }, { left: "Ram Air Turbine (RAT)", right: "Last-resort emergency windmill" } ], exp: "Airliners have backups for their backups." },
+            { type: 'mcq', q: "What deploys if ALL engines and ALL normal hydraulic pumps fail?", options: ["A parachute", "The Ram Air Turbine (RAT), a small windmill that drops from the belly to provide emergency hydraulic pressure", "Airbags", "Solar panels"], answer: 1, exp: "The RAT spins in the slipstream to keep the flight controls working." },
+            { type: 'fill-blank', q: "Pneumatic bleed air is routed through the leading edges of the wings to prevent _________ buildup.", answer: "ice", altAnswers: ["Ice", "ice"] , exp: "Ice disrupts the smooth airflow and destroys lift." },
+            { type: 'mcq', q: "Can hydraulic fluids from System A and System B mix together?", options: ["Yes, they share the same tank", "No, they are kept completely isolated so a leak in one doesn't drain the other", "Yes, but only in the air", "No, they are different colors"], answer: 1, exp: "Isolation is the key to true redundancy." },
+            { type: 'mcq', q: "How does the landing gear retract?", options: ["A pilot cranks a wheel", "Massive hydraulic actuators push them into the wheel wells", "Wind pushes them back", "Electric servos"], answer: 1, exp: "Hydraulics provide the immense force required to fold up the heavy gear against the wind." }
+        ]
+    },
+    {
+        id: "electrical-ignition",
+        title: "Electrical & Ignition Systems",
+        hasVideo: true,
+        videoPlaceholder: "electric_poster.png",
+        textContent: `
+
+            <h2>Electrical & Ignition Systems</h2>
+            <p>A modern airliner is a flying supercomputer. It generates enough raw electrical wattage to comfortably power a small neighborhood block. This massive electrical grid is the absolute lifeblood of the digital avionics, the fly-by-wire sensors, and the vast interior lighting arrays.</p>
+
+            <div class="content-grid">
+                <div class="glass-panel">
+                    <h3><i data-lucide="zap"></i> Generators (IDG)</h3>
+                    <p>Physically attached to the spinning gearbox of each main engine is an Integrated Drive Generator (IDG). As the jet engine spins at thousands of RPMs, it violently turns the IDG, producing extremely stable 115-volt <span class="physics-term" data-definition="An electric current which periodically reverses direction.">Alternating Current (AC)</span> power. This represents the primary, heavy-duty source of electricity for the aircraft while in flight.</p>
+                </div>
+                <div class="glass-panel">
+                    <h3><i data-lucide="battery"></i> Deep-Cycle Batteries</h3>
+                    <p>Heavy-duty Lithium-Ion or NiCad chemical batteries are securely stored in the forward avionics bay. They provide the ultimate emergency backup power to keep essential digital flight instruments and radio transmitters running if all engines (and their attached generators) suffer a catastrophic failure.</p>
+                </div>
+                <div class="glass-panel">
+                    <h3><i data-lucide="flame"></i> Ignition Exciters</h3>
+                    <p>Unlike a standard car engine which fires a spark plug thousands of times every minute to ignite individual bursts of fuel, a jet engine's combustion is one continuous, unending explosion. The high-voltage spark igniters are therefore only used during the initial engine startup sequence, or turned on during heavy rain and violent turbulence to actively prevent the continuous flame from accidentally blowing out.</p>
+                </div>
+            </div>
+
+            <div class="highlight-box">
+                <h3><i data-lucide="power"></i> The Auxiliary Power Unit (APU)</h3>
+                <p>When the massive airliner is parked at the airport gate with its main engines completely shut off, how does the plane still have blazing interior lights, functioning digital screens, and blasting air conditioning? The secret is the <strong>Auxiliary Power Unit (APU)</strong>—a miniature, independent jet engine hidden in the very tail cone of the aircraft. It burns fuel from the main tanks just to run a dedicated electrical generator and a pneumatic air compressor, keeping the plane "alive" and comfortable on the ground without wasting the lifespan of the massive main engines.</p>
+            </div>
+            
+        `,
+        quiz: [
+            { type: 'mcq', q: "What provides electrical power to the aircraft while it is parked at the gate with main engines off?", options: ["The Integrated Drive Generator (IDG)", "The Auxiliary Power Unit (APU) hidden in the tail", "Solar panels on the wings", "AA Batteries"], answer: 1, exp: "The APU is a miniature jet engine that burns fuel to run an electrical generator and air compressor." },
+            { type: 'fill-blank', q: "When flying, the Integrated Drive Generator (IDG) produces 115-volt _________ Current (AC) power.", answer: "alternating", altAnswers: ["Alternating", "alternating", "AC", "ac"], exp: "AC power is the heavy-duty primary source of electricity for the aircraft." },
+            { type: 'match', q: "Match the electrical component to its role:", pairs: [ { left: "Generators (IDG)", right: "Primary AC power in flight" }, { left: "Deep-Cycle Batteries", right: "Emergency backup power" }, { left: "Ignition Exciters", right: "Sparks used only during startup/turbulence" } ], exp: "A modern airliner relies entirely on its complex electrical grid." },
+            { type: 'mcq', q: "What does the Transformer Rectifier Unit (TRU) do?", options: ["Transforms the plane into a robot", "Converts 115V AC power into 28V DC power for sensitive electronics", "Pumps fuel", "Generates thrust"], answer: 1, exp: "Computers and screens require smooth DC power." },
+            { type: 'fill-blank', q: "In a jet engine, the massive spark plugs are called _________.", answer: "igniters", altAnswers: ["Igniters", "igniters", "igniter"] , exp: "Igniters create a massive electrical arc to light the fuel." },
+            { type: 'match', q: "Match the power source to its output:", pairs: [ { left: "Integrated Drive Generator", right: "115V AC" }, { left: "Main Battery", right: "28V DC" }, { left: "Igniter Box", right: "20,000+ Volts" } ], exp: "Voltage is stepped up or down depending on the need." },
+            { type: 'mcq', q: "Unlike a car, when do the igniters in a jet engine typically spark?", options: ["Constantly during the entire flight", "Only during engine startup, heavy rain, or severe turbulence", "Only when landing", "Never"], answer: 1, exp: "The fire in a jet engine is self-sustaining. Sparks are only needed to light it initially or prevent it from blowing out." },
+            { type: 'fill-blank', q: "The APU is usually located in the very _________ of the aircraft fuselage.", answer: "tail", altAnswers: ["Tail", "tail", "rear"] , exp: "The tail provides a safe, isolated spot for the APU exhaust." },
+            { type: 'mcq', q: "What happens if both IDGs fail in flight?", options: ["The plane falls", "The APU can be started in mid-air to provide backup electrical power", "The passengers must pedal", "The batteries will last for 10 hours"], answer: 1, exp: "The APU is a crucial backup generator." },
+            { type: 'mcq', q: "Why do aircraft use 400 Hz AC power instead of the 60 Hz used in standard homes?", options: ["It is quieter", "Higher frequency allows for much smaller, lighter transformers and motors, saving massive weight", "It looks better", "It prevents lightning"], answer: 1, exp: "Weight is everything in aerospace; 400Hz equipment is much lighter." }
+        ]
+    },
+    {
+        id: "engine-start",
+        title: "Which part initiates the engine start?",
+        hasVideo: false,
+        textContent: `
+
+            <h2>The Engine Start Sequence: Waking the Beast</h2>
+            <p>You cannot simply turn a metal key to start a massive, 10-ton turbofan engine. A jet engine must be forcefully, physically spun up to thousands of RPMs to violently compress enough incoming air <em>before</em> any highly volatile fuel or electrical spark is introduced. The sequence must be perfectly, meticulously timed by the computers.</p>
+
+            <div class="highlight-box">
+                <h3><i data-lucide="activity"></i> The Highly Choreographed Starting Sequence</h3>
+                <ol style="margin-left: 1rem; margin-top: 1rem; color: var(--text-light);">
+                    <li><strong>Air Supply:</strong> High-pressure pneumatic <span class="physics-term" data-definition="Compressed air taken from the engine compressor stage before fuel is injected.">Bleed Air</span> from the spinning APU in the tail (or a yellow ground cart) is forcefully routed into the dormant main engine.</li>
+                    <li><strong>Spinning the Turbine:</strong> This high-pressure air blasts into a small Air Turbine Starter mechanism, which uses a reduction gearbox to physically grab and violently rotate the massive, heavy core of the main jet engine.</li>
+                    <li><strong>Airflow Established:</strong> As the core spins up, the massive front compressor begins aggressively sucking in air from the atmosphere, reaching around 20% of its maximum RPM purely from the starter motor.</li>
+                    <li><strong>Ignition:</strong> The pilot flips the ignition switch. The high-voltage spark igniters begin clicking rapidly inside the dark combustion chamber, creating a continuous arc of electricity.</li>
+                    <li><strong>Fuel Flow:</strong> The pilot finally introduces Jet-A fuel. It is perfectly atomized and sprays directly into the spinning, sparking, highly compressed air.</li>
+                    <li><strong>Light-off:</strong> The volatile mixture violently ignites. The sudden expansion of the superheated exhaust gas forcefully spins the rear turbine. The engine is now entirely self-sustaining, generating its own power, and the pneumatic starter automatically disconnects.</li>
+                </ol>
+            </div>
+
+            <p>If the jet fuel is introduced too early, or the engine isn't physically spinning fast enough to blow the explosive fire out the back, the massive flames will actually shoot forward out of the intake fan—a highly dangerous, visually terrifying event known as a <span class="physics-term" data-definition="When an engine overheats severely during start because airflow is insufficient to blow the heat out the exhaust.">Hot Start</span>, which requires the pilot to instantly cut the fuel supply to save the engine from melting.</p>
+            
+        `,
+        quiz: [
+            { type: 'mcq', q: "What must happen BEFORE fuel and spark are introduced into a jet engine during startup?", options: ["The pilots must pray", "The engine must be forcefully spun up by pneumatic air to compress incoming oxygen", "The landing gear must be retracted", "The cabin must be depressurized"], answer: 1, exp: "The engine must be spinning rapidly to create a continuous flow of highly compressed air." },
+            { type: 'fill-blank', q: "If jet fuel is introduced too early, massive flames will shoot forward out of the intake, causing a highly dangerous _________ Start.", answer: "hot", altAnswers: ["Hot", "hot", "hot start"], exp: "A Hot Start occurs when there isn't enough internal airflow to blow the explosive fire out the exhaust nozzle." },
+            { type: 'match', q: "Order the highly choreographed Engine Start Sequence:", pairs: [ { left: "Step 1", right: "Pneumatic Bleed Air routed to starter" }, { left: "Step 2", right: "Engine core physically spun up" }, { left: "Step 3", right: "Igniters click and Fuel is sprayed" }, { left: "Step 4", right: "Light-off and self-sustaining combustion" } ], exp: "The sequence is meticulously timed by the computers to prevent melting the turbine." },
+            { type: 'mcq', q: "Where does the pneumatic air used to start the main engines usually come from?", options: ["The tires", "The APU (Auxiliary Power Unit)", "Wind", "The fuel tanks"], answer: 1, exp: "The APU acts as a powerful air compressor to blow-start the main engines." },
+            { type: 'fill-blank', q: "The automated computer that monitors and controls the engine start sequence is the _________ (Full Authority Digital Engine Control).", answer: "fadec", altAnswers: ["FADEC", "fadec"] , exp: "FADEC handles the complex timing of fuel and sparks." },
+            { type: 'match', q: "Match the start anomaly to its description:", pairs: [ { left: "Hot Start", right: "Temperatures exceed limits, melting turbines" }, { left: "Hung Start", right: "Engine lights but fails to accelerate to idle speed" }, { left: "Wet Start", right: "Fuel pools without igniting" } ], exp: "FADEC will automatically abort the start if it detects any of these." },
+            { type: 'mcq', q: "What is a 'cross-bleed' start?", options: ["Bleeding fuel across the wings", "Using the pressurized bleed air from an already running Engine 1 to start Engine 2", "Starting the engine in reverse", "Bleeding hydraulic fluid"], answer: 1, exp: "If the APU is broken, one running engine can blow-start the other." },
+            { type: 'fill-blank', q: "Once the engine reaches self-sustaining speed, the pneumatic _________ valve snaps shut.", answer: "starter", altAnswers: ["Starter", "starter"] , exp: "The starter motor disengages, much like letting go of the key in a car." },
+            { type: 'mcq', q: "Why do pilots monitor EGT (Exhaust Gas Temperature) so closely during startup?", options: ["To keep the cabin warm", "Because if it rises too fast, it indicates a Hot Start that will destroy the engine", "To measure thrust", "To check fuel pressure"], answer: 1, exp: "EGT is the primary indicator of engine health during light-off." },
+            { type: 'mcq', q: "What produces the loud 'clicking' sound during engine start?", options: ["The fan blades hitting the casing", "The high-voltage Igniters firing massive sparks", "The hydraulic pumps", "The passengers' seatbelts"], answer: 1, exp: "The igniters fire rapidly until combustion is stable." }
+        ]
+    }
+);
+
+</script>
+    <script>
+document.addEventListener("DOMContentLoaded", () => {
+    lucide.createIcons();
+    
+    const sidebar = document.getElementById("sidebar");
+    const navMenu = document.getElementById("nav-menu");
+    const contentArea = document.getElementById("content-area");
+    const mobileMenuBtn = document.getElementById("mobile-menu-btn");
+    
+    // Mobile menu toggle
+    mobileMenuBtn.addEventListener("click", () => {
+        sidebar.classList.toggle("open");
+    });
+    
+    // Close sidebar when clicking outside on mobile
+    document.addEventListener("click", (e) => {
+        if (window.innerWidth <= 768 && !sidebar.contains(e.target) && !mobileMenuBtn.contains(e.target)) {
+            sidebar.classList.remove("open");
+        }
+    });
+
+    let currentSectionId = courseData[0].id;
+    
+    // Initialize Navigation
+    function initNav() {
+        navMenu.innerHTML = '';
+        courseData.forEach(section => {
+            const btn = document.createElement("button");
+            btn.className = `nav-item ${section.id === currentSectionId ? 'active' : ''}`;
+            btn.textContent = section.title;
+            btn.onclick = () => loadSection(section.id);
+            navMenu.appendChild(btn);
+        });
+    }
+
+    // Load a specific section
+    window.loadSection = function(id) {
+        currentSectionId = id;
+        initNav(); // Update active state
+        
+        if (window.innerWidth <= 768) {
+            sidebar.classList.remove("open");
+        }
+        
+        const section = courseData.find(s => s.id === id);
+        renderSection(section);
+    }
+
+    function renderSection(section) {
+        const leftoverPlanes = document.getElementById('perfect-score-wrapper');
+        if (leftoverPlanes) leftoverPlanes.remove();
+        document.querySelectorAll('svg.flying-plane').forEach(el => el.remove());
+
+        contentArea.innerHTML = '';
+        if (window.animManager) window.animManager.stop();
+        
+        if (section.animationType) {
+            const animHtml = `
+                <div class="animation-container">
+                    <canvas id="sim-canvas" width="800" height="400"></canvas>
+                    <div id="sim-controls" class="sim-controls"></div>
+                </div>
+            `;
+            contentArea.innerHTML += animHtml;
+            setTimeout(() => {
+                if(!window.animManager) window.animManager = new AnimationManager();
+                window.animManager.start(section.animationType);
+            }, 50);
+        } else if (section.hasVideo) {
+            const videoHtml = `
+                <div class="video-container" onclick="playVideoSimulation()">
+                    <img src="assets/${section.videoPlaceholder}" alt="Video placeholder for ${section.title}" onerror="this.src='https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1200&q=80'">
+                    <div class="play-button"><i data-lucide="play" style="width: 36px; height: 36px;"></i></div>
+                    <div class="video-overlay">Animated Physics: ${section.title}</div>
+                </div>
+            `;
+            contentArea.innerHTML += videoHtml;
+        }
+
+        // Tabs
+        if (section.quiz && section.quiz.length > 0) {
+            const tabsHtml = `
+                <div class="tabs-container">
+                    <div class="tabs-header">
+                        <button class="tab-btn active" onclick="switchTab('text')"><i data-lucide="file-text"></i> Textual Content</button>
+                        <button class="tab-btn" onclick="switchTab('quiz')"><i data-lucide="check-square"></i> Knowledge Check</button>
+                    </div>
+                    <div id="tab-text" class="tab-content active textual-content">
+                        ${section.textContent}
+                    </div>
+                    <div id="tab-quiz" class="tab-content">
+                        <div id="quiz-container" class="quiz-container"></div>
+                    </div>
+                </div>
+            `;
+            contentArea.innerHTML += tabsHtml;
+            initQuiz(section.quiz);
+        } else {
+            // Just text if no quiz
+            const textHtml = `
+                <div class="tabs-container">
+                    <div id="tab-text" class="tab-content active textual-content">
+                        ${section.textContent}
+                    </div>
+                </div>
+            `;
+            contentArea.innerHTML += textHtml;
+        }
+
+        lucide.createIcons();
+        initTooltips();
+        
+        // Scroll to top
+        document.getElementById('main-content').scrollTop = 0;
+    }
+
+    // Tab Switching
+    window.switchTab = function(tabName) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        
+        const activeBtn = event.currentTarget;
+        activeBtn.classList.add('active');
+        document.getElementById(`tab-${tabName}`).classList.add('active');
+    }
+
+    // Video Simulation
+    window.playVideoSimulation = function() {
+        alert("This is an animated video placeholder showcasing the physics of this section.");
+    }
+
+    // Quiz Logic
+    function initQuiz(questions) {
+        const container = document.getElementById('quiz-container');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        window.currentQuizData = questions;
+        
+        questions.forEach((q, index) => {
+            let questionContent = '';
+            
+            if (!q.type || q.type === 'mcq') {
+                questionContent = `
+                    <div class="options-grid" id="options-${index}">
+                        ${q.options.map((opt, i) => `
+                            <button class="option-btn" onclick="selectOption(${index}, ${i}, ${q.answer}, '${q.exp.replace(/'/g, "\\' ")}')">
+                                ${opt}
+                            </button>
+                        `).join('')}
+                    </div>
+                `;
+            } else if (q.type === 'fill-blank') {
+                questionContent = `
+                    <div class="fill-blank-container" id="fill-blank-${index}">
+                        <input type="text" class="quiz-blank-input" id="input-${index}" placeholder="Type your answer here..." autocomplete="off" />
+                        <button class="check-btn" onclick="checkFillBlank(${index})">Check Answer</button>
+                    </div>
+                `;
+            } else if (q.type === 'match') {
+                const rights = [...q.pairs.map(p => p.right)].sort(() => Math.random() - 0.5);
+                questionContent = `
+                    <div class="match-container" id="match-${index}">
+                        ${q.pairs.map((p, i) => `
+                            <div class="match-row">
+                                <div class="match-left">${p.left}</div>
+                                <select class="match-select" id="match-select-${index}-${i}">
+                                    <option value="">Select match...</option>
+                                    ${rights.map(r => `<option value="${r}">${r}</option>`).join('')}
+                                </select>
+                            </div>
+                        `).join('')}
+                        <button class="check-btn" style="margin-top: 1rem;" onclick="checkMatch(${index})">Check Matches</button>
+                    </div>
+                `;
+            }
+
+            const questionHtml = `
+                <div class="question-block" id="q-block-${index}">
+                    <div class="question-text">${index + 1}. ${q.q}</div>
+                    ${questionContent}
+                    <div class="explanation-box" id="exp-${index}">
+                        <h4>Explanation</h4>
+                        <p>${q.exp}</p>
+                    </div>
+                </div>
+            `;
+            container.innerHTML += questionHtml;
+        });
+        
+        container.innerHTML += `
+            <div id="quiz-results" class="quiz-results">
+                <h2 id="result-title">Quiz Complete!</h2>
+                <p class="final-score">Score: <span id="score-display">0</span> / ${questions.length}</p>
+                <h3 id="advice-display"></h3>
+            </div>
+        `;
+        
+        window.currentQuizState = {
+            total: questions.length,
+            answered: 0,
+            score: 0
+        };
+    }
+
+    function triggerPerfectScoreAnimation() {
+        const wrapper = document.createElement('div');
+        wrapper.id = 'perfect-score-wrapper';
+        document.body.appendChild(wrapper);
+
+        for (let i = 0; i < 15; i++) {
+            const plane = document.createElement('i');
+            plane.setAttribute('data-lucide', 'plane');
+            plane.className = 'flying-plane';
+            
+            const leftPos = Math.random() * 100;
+            const delay = Math.random() * 1.5;
+            const duration = 1.5 + Math.random() * 2;
+            
+            plane.style.left = `${leftPos}vw`;
+            plane.style.animationDelay = `${delay}s`;
+            plane.style.animationDuration = `${duration}s`;
+            
+            wrapper.appendChild(plane);
+        }
+        lucide.createIcons();
+
+        setTimeout(() => {
+            wrapper.remove();
+        }, 5000);
+    }
+
+    function checkQuizComplete() {
+        window.currentQuizState.answered++;
+        if (window.currentQuizState.answered === window.currentQuizState.total) {
+            const results = document.getElementById('quiz-results');
+            const score = window.currentQuizState.score;
+            const total = window.currentQuizState.total;
+            const percentage = score / total;
+            
+            document.getElementById('score-display').textContent = score;
+            const advice = document.getElementById('advice-display');
+            const title = document.getElementById('result-title');
+            
+            if (percentage === 1) {
+                advice.textContent = "PERFECT SCORE! You're a certified Aviation Expert! 🏆";
+                advice.style.color = 'var(--accent)';
+                title.textContent = "Outstanding!";
+                results.classList.add('perfect-glow');
+                triggerPerfectScoreAnimation();
+            } else if (percentage >= 0.8) {
+                advice.textContent = "Excellent work! You have a solid grasp of aeronautical concepts.";
+                advice.style.color = 'var(--text-light)';
+            } else if (percentage >= 0.5) {
+                advice.textContent = "Good effort! You're getting the hang of it, but there's room for improvement.";
+                advice.style.color = '#ffb86c';
+            } else {
+                advice.textContent = "Keep studying! Review the highlighted physics terms above and try again.";
+                advice.style.color = 'var(--incorrect)';
+            }
+            
+            results.style.display = 'block';
+            
+            setTimeout(() => {
+                const mainContent = document.getElementById('main-content');
+                if (mainContent) {
+                    mainContent.scrollTo({
+                        top: mainContent.scrollHeight,
+                        behavior: 'smooth'
+                    });
+                }
+            }, 300);
+        }
+    }
+
+    window.selectOption = function(qIndex, selectedOptionIndex, correctOptionIndex, explanation) {
+        const optionsGrid = document.getElementById(`options-${qIndex}`);
+        const buttons = optionsGrid.querySelectorAll('.option-btn');
+        if (buttons[0].disabled) return;
+        
+        buttons.forEach(btn => btn.disabled = true);
+        buttons[selectedOptionIndex].classList.add('selected');
+        
+        if (selectedOptionIndex === correctOptionIndex) {
+            buttons[selectedOptionIndex].classList.add('correct');
+            window.currentQuizState.score++;
+        } else {
+            buttons[selectedOptionIndex].classList.add('wrong');
+            buttons[correctOptionIndex].classList.add('correct');
+        }
+        
+        document.getElementById(`exp-${qIndex}`).classList.add('show');
+        checkQuizComplete();
+    }
+
+    window.checkFillBlank = function(qIndex) {
+        const input = document.getElementById(`input-${qIndex}`);
+        const btn = document.querySelector(`#fill-blank-${qIndex} .check-btn`);
+        if (input.disabled) return;
+        
+        const qData = window.currentQuizData[qIndex];
+        const userAnswer = input.value.trim().toLowerCase();
+        const correctAnswer = qData.answer.toLowerCase();
+        
+        input.disabled = true;
+        btn.disabled = true;
+        
+        if (userAnswer === correctAnswer || (qData.altAnswers && qData.altAnswers.some(a => a.toLowerCase() === userAnswer))) {
+            input.classList.add('correct');
+            window.currentQuizState.score++;
+        } else {
+            input.classList.add('wrong');
+            input.value = `${input.value} (Correct: ${qData.answer})`;
+        }
+        
+        document.getElementById(`exp-${qIndex}`).classList.add('show');
+        checkQuizComplete();
+    }
+
+    window.checkMatch = function(qIndex) {
+        const container = document.getElementById(`match-${qIndex}`);
+        const btn = container.querySelector('.check-btn');
+        if (btn.disabled) return;
+        
+        const qData = window.currentQuizData[qIndex];
+        let allCorrect = true;
+        
+        qData.pairs.forEach((p, i) => {
+            const select = document.getElementById(`match-select-${qIndex}-${i}`);
+            select.disabled = true;
+            if (select.value === p.right) {
+                select.classList.add('correct');
+            } else {
+                select.classList.add('wrong');
+                allCorrect = false;
+                // Add a small span showing correct answer
+                const corrSpan = document.createElement('span');
+                corrSpan.style.color = 'var(--correct)';
+                corrSpan.style.marginLeft = '10px';
+                corrSpan.style.fontSize = '0.8rem';
+                corrSpan.innerText = `(Correct: ${p.right})`;
+                select.parentNode.appendChild(corrSpan);
+            }
+        });
+        
+        btn.disabled = true;
+        
+        if (allCorrect) {
+            window.currentQuizState.score++;
+        }
+        
+        document.getElementById(`exp-${qIndex}`).classList.add('show');
+        checkQuizComplete();
+    }
+
+    // Tooltip Logic
+    const tooltip = document.getElementById('physics-tooltip');
+    const tooltipTitle = document.getElementById('tooltip-title');
+    const tooltipDesc = document.getElementById('tooltip-desc');
+
+    function initTooltips() {
+        const terms = document.querySelectorAll('.physics-term');
+        
+        terms.forEach(term => {
+            term.addEventListener('mouseenter', (e) => {
+                const rect = e.target.getBoundingClientRect();
+                const text = e.target.textContent;
+                const def = e.target.getAttribute('data-definition');
+                
+                tooltipTitle.textContent = text;
+                tooltipDesc.textContent = def;
+                
+                tooltip.style.left = `${rect.left}px`;
+                tooltip.style.top = `${rect.bottom + window.scrollY + 10}px`;
+                tooltip.classList.remove('hidden');
+            });
+            
+            term.addEventListener('mouseleave', () => {
+                tooltip.classList.add('hidden');
+            });
+        });
+    }
+
+    // Initialize the app
+    initNav();
+    loadSection(currentSectionId);
+});
+
+
+
+// Scroll to Top Function
+window.scrollToTop = function() {
+    const mainContent = document.getElementById('main-content');
+    if (mainContent) {
+        mainContent.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+        // Briefly highlight the quiz tab so they know where to click
+        setTimeout(() => {
+            const quizBtn = document.getElementById('quiz-btn');
+            if(quizBtn && !quizBtn.classList.contains('active')) {
+                quizBtn.style.transition = 'all 0.3s';
+                quizBtn.style.backgroundColor = 'rgba(100, 255, 218, 0.3)';
+                setTimeout(() => {
+                    quizBtn.style.backgroundColor = '';
+                }, 800);
+            }
+        }, 500);
+    }
+}
+
+// --- KEYCHAIN SCROLL ENGINE ---
+class KeychainScrollEngine {
+    constructor(contentId, trackId, thumbId) {
+        this.content = document.getElementById(contentId);
+        this.track = document.getElementById(trackId);
+        this.keychain = document.getElementById(thumbId);
+        
+        if (!this.content || !this.keychain) return;
+
+        this.lastScrollY = this.content.scrollTop;
+        this.velocity = 0;
+        this.swingAngle = 0;
+        
+        this.isDragging = false;
+        this.startY = 0;
+        this.startScroll = 0;
+
+        this.initEvents();
+        this.renderLoop = this.renderLoop.bind(this);
+        requestAnimationFrame(this.renderLoop);
+    }
+
+    initEvents() {
+        // Dragging Logic
+        this.keychain.addEventListener('mousedown', (e) => {
+            this.isDragging = true;
+            this.startY = e.clientY;
+            this.startScroll = this.content.scrollTop;
+            document.body.style.userSelect = 'none';
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (!this.isDragging) return;
+            const deltaY = e.clientY - this.startY;
+            
+            // Calculate ratio
+            const scrollableHeight = this.content.scrollHeight - this.content.clientHeight;
+            const trackHeight = this.track.clientHeight - 150; // 150 is keychain height
+            
+            if (trackHeight <= 0) return;
+            
+            const scrollRatio = scrollableHeight / trackHeight;
+            this.content.scrollTop = this.startScroll + (deltaY * scrollRatio);
+        });
+
+        window.addEventListener('mouseup', () => {
+            this.isDragging = false;
+            document.body.style.userSelect = '';
+        });
+    }
+
+    renderLoop() {
+        if (!this.content || !this.keychain) return;
+
+        const currentScroll = this.content.scrollTop;
+        const scrollableHeight = this.content.scrollHeight - this.content.clientHeight;
+        const trackHeight = this.track.clientHeight - 150;
+        
+        // Hide keychain if nothing to scroll
+        if (scrollableHeight <= 0) {
+            this.track.style.display = 'none';
+            return requestAnimationFrame(this.renderLoop);
+        } else {
+            this.track.style.display = 'block';
+        }
+
+        // Toggle Scroll to Top Button (only for main content)
+        if (this.content.id === 'main-content') {
+            const scrollBtn = document.getElementById('scroll-to-top-btn');
+            if (scrollBtn) {
+                if (currentScroll > 300) {
+                    scrollBtn.classList.add('visible');
+                } else {
+                    scrollBtn.classList.remove('visible');
+                }
+            }
+        }
+
+        // Calculate Y position
+        const percentage = currentScroll / scrollableHeight;
+        const yPos = percentage * trackHeight;
+        
+        // Calculate Velocity for Swinging Physics
+        this.velocity = currentScroll - this.lastScrollY;
+        this.lastScrollY = currentScroll;
+        
+        // Apply physics (damped pendulum)
+        let targetAngle = this.velocity * -0.5; // swing opposite to movement
+        // Limit max swing
+        if (targetAngle > 45) targetAngle = 45;
+        if (targetAngle < -45) targetAngle = -45;
+        
+        // Smoothly approach target angle
+        this.swingAngle += (targetAngle - this.swingAngle) * 0.1;
+        // Damping when stationary
+        if (Math.abs(this.velocity) < 1) {
+            this.swingAngle *= 0.9; 
+        }
+
+        this.keychain.style.transform = `translateY(${yPos}px) rotate(${this.swingAngle}deg)`;
+
+        requestAnimationFrame(this.renderLoop);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        window.scrollEngineMain = new KeychainScrollEngine('main-content', 'custom-scrollbar-track', 'custom-keychain');
+        window.scrollEngineSidebar = new KeychainScrollEngine('sidebar', 'sidebar-scrollbar-track', 'sidebar-keychain');
+    }, 100);
+});
+
+// --- ANIMATION MANAGER ---
+class AnimationManager {
+    constructor() {
+        this.canvas = null;
+        this.ctx = null;
+        this.reqId = null;
+        this.type = null;
+        this.particles = [];
+        this.state = {};
+    }
+
+    stop() {
+        if(this.reqId) cancelAnimationFrame(this.reqId);
+        this.reqId = null;
+        this.type = null;
+        this.particles = [];
+        this.state = {};
+    }
+
+    start(type) {
+        this.stop();
+        this.canvas = document.getElementById('sim-canvas');
+        if(!this.canvas) return;
+        this.ctx = this.canvas.getContext('2d');
+        this.type = type;
+        
+        const controls = document.getElementById('sim-controls');
+        controls.innerHTML = '';
+
+        if(type === 'windtunnel') {
+            this.state.aoa = 5;
+            controls.innerHTML = `<label>Angle of Attack: <input type="range" id="aoa-slider" min="-5" max="25" value="5"></label>`;
+            document.getElementById('aoa-slider').oninput = (e) => this.state.aoa = parseInt(e.target.value);
+            for(let i=0; i<150; i++) this.particles.push(this.createParticle());
+        } 
+        else if (type === 'engine') {
+            this.state.throttle = 50;
+            this.state.angle = 0;
+            controls.innerHTML = `<label>Throttle: <input type="range" id="thr-slider" min="0" max="100" value="50"></label>`;
+            document.getElementById('thr-slider').oninput = (e) => this.state.throttle = parseInt(e.target.value);
+        }
+        else if (type === 'blueprint') {
+            this.state.time = 0;
+        }
+
+        this.loop = this.loop.bind(this);
+        this.reqId = requestAnimationFrame(this.loop);
+    }
+
+    createParticle() {
+        return {
+            x: Math.random() * 800,
+            y: Math.random() * 400,
+            speed: 5 + Math.random() * 3
+        };
+    }
+
+    loop() {
+        if(!this.ctx) return;
+        this.ctx.clearRect(0, 0, 800, 400);
+
+        if(this.type === 'windtunnel') this.drawWindTunnel();
+        else if (this.type === 'engine') this.drawEngine();
+        else if (this.type === 'blueprint') this.drawBlueprint();
+
+        this.reqId = requestAnimationFrame(this.loop);
+    }
+
+    drawWindTunnel() {
+        const ctx = this.ctx;
+        const aoa = this.state.aoa * Math.PI / 180;
+        
+        ctx.fillStyle = 'rgba(100, 255, 218, 0.6)';
+        this.particles.forEach(p => {
+            let vx = p.speed;
+            let vy = 0;
+            
+            if(p.x > 300 && p.x < 500 && p.y > 150 && p.y < 250) {
+                if(p.y < 200) vy = -2;
+                else vy = 2 + (this.state.aoa * 0.1);
+            }
+
+            p.x += vx;
+            p.y += vy;
+            if(p.x > 800) { p.x = -10; p.y = Math.random() * 400; }
+            
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 2, 0, Math.PI*2);
+            ctx.fill();
+        });
+
+        ctx.save();
+        ctx.translate(400, 200);
+        ctx.rotate(-aoa);
+        
+        ctx.beginPath();
+        ctx.moveTo(-100, 0);
+        ctx.quadraticCurveTo(-50, -40, 0, -30);
+        ctx.quadraticCurveTo(50, -20, 100, 0);
+        ctx.quadraticCurveTo(50, 10, 0, 10);
+        ctx.quadraticCurveTo(-50, 10, -100, 0);
+        
+        ctx.fillStyle = '#ccd6f6';
+        ctx.fill();
+        ctx.strokeStyle = '#8892b0';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.restore();
+        
+        let liftForce = Math.max(0, this.state.aoa * 2.5 + 20);
+        if(this.state.aoa > 15) liftForce = Math.max(0, liftForce - (this.state.aoa-15)*5);
+        ctx.strokeStyle = '#64ffda';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(400, 200);
+        ctx.lineTo(400, 200 - liftForce);
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(400, 200 - liftForce);
+        ctx.lineTo(390, 200 - liftForce + 15);
+        ctx.lineTo(410, 200 - liftForce + 15);
+        ctx.fillStyle = '#64ffda';
+        ctx.fill();
+        
+        ctx.fillStyle = '#fff';
+        ctx.font = '16px monospace';
+        ctx.fillText(this.state.aoa > 15 ? 'STALLING!' : 'LIFT FORCE', 420, 200 - liftForce/2);
+    }
+
+    drawEngine() {
+        const ctx = this.ctx;
+        this.state.angle += (this.state.throttle / 100) * 0.5;
+        
+        ctx.fillStyle = '#112240';
+        ctx.fillRect(200, 100, 400, 200);
+        ctx.strokeStyle = '#8892b0';
+        ctx.lineWidth = 5;
+        ctx.strokeRect(200, 100, 400, 200);
+        
+        let glow = this.state.throttle / 100;
+        let grad = ctx.createLinearGradient(600, 200, 800, 200);
+        grad.addColorStop(0, `rgba(255, 100, 0, ${glow})`);
+        grad.addColorStop(1, 'rgba(255, 0, 0, 0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(600, 120, 200, 160);
+        
+        ctx.save();
+        ctx.translate(300, 200);
+        ctx.rotate(this.state.angle);
+        ctx.fillStyle = '#ccd6f6';
+        for(let i=0; i<12; i++) {
+            ctx.rotate((Math.PI * 2) / 12);
+            ctx.beginPath();
+            ctx.ellipse(0, 40, 10, 40, 0, 0, Math.PI*2);
+            ctx.fill();
+            ctx.stroke();
+        }
+        ctx.beginPath();
+        ctx.arc(0, 0, 20, 0, Math.PI*2);
+        ctx.fillStyle = '#64ffda';
+        ctx.fill();
+        ctx.restore();
+        
+        ctx.fillStyle = '#fff';
+        ctx.font = '20px monospace';
+        ctx.fillText('N1: ' + Math.floor(this.state.throttle * 1.5) + '%', 350, 50);
+    }
+    
+    drawBlueprint() {
+        const ctx = this.ctx;
+        this.state.time += 0.05;
+        
+        ctx.strokeStyle = 'rgba(100, 255, 218, 0.1)';
+        ctx.lineWidth = 1;
+        for(let i=0; i<800; i+=40) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,400); ctx.stroke(); }
+        for(let i=0; i<400; i+=40) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(800,i); ctx.stroke(); }
+        
+        ctx.strokeStyle = '#64ffda';
+        ctx.lineWidth = 3;
+        ctx.fillStyle = 'rgba(10, 25, 47, 0.8)';
+        
+        ctx.beginPath();
+        ctx.ellipse(400, 200, 250, 40, 0, 0, Math.PI*2);
+        ctx.fill(); ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(350, 160);
+        ctx.lineTo(250, 50);
+        ctx.lineTo(300, 50);
+        ctx.lineTo(450, 160);
+        ctx.fill(); ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(350, 240);
+        ctx.lineTo(250, 350);
+        ctx.lineTo(300, 350);
+        ctx.lineTo(450, 240);
+        ctx.fill(); ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(600, 180);
+        ctx.lineTo(650, 100);
+        ctx.lineTo(670, 100);
+        ctx.lineTo(650, 180);
+        ctx.fill(); ctx.stroke();
+        
+        let scanY = 200 + Math.sin(this.state.time) * 150;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(100, scanY);
+        ctx.lineTo(700, scanY);
+        ctx.stroke();
+        
+        ctx.fillStyle = '#fff';
+        ctx.font = '16px monospace';
+        ctx.fillText('SYSTEM ANALYSIS ACTIVE', 50, 30);
+    }
+}
+
+// Home Page Transition
+window.enterCourse = function() {
+    const homePage = document.getElementById('home-page');
+    const app = document.getElementById('app');
+    
+    homePage.classList.add('taking-off');
+    
+    setTimeout(() => {
+        homePage.style.display = 'none';
+        app.style.display = 'flex';
+        app.style.animation = 'fadeInUp 0.8s ease-out';
+        lucide.createIcons();
+    }, 1800);
+}
+
+// Return to Home Page
+window.returnToHome = function() {
+    const homePage = document.getElementById('home-page');
+    const app = document.getElementById('app');
+    
+    app.style.display = 'none';
+    
+    // Reset home page animation
+    homePage.classList.remove('taking-off');
+    homePage.style.display = 'flex';
+    homePage.style.opacity = '1';
+    
+    // Re-initialize icons just in case
+    lucide.createIcons();
+}
+</script>
+</body>
+</html>
+
+
