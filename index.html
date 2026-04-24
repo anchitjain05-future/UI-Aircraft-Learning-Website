@@ -1587,9 +1587,13 @@ window.courseData.push(
     {
         id: "aircraft-components",
         title: "Aircraft Components",
-        hasVideo: true,
-        videoPlaceholder: "components_poster.png",
+        hasVideo: false,
         textContent: `
+            <iframe 
+                src="components/aerolearn_airplane_parts.html"
+                style="width:100%; height:520px; border:none;">
+            </iframe>
+
 
             <h2>Systems Architecture & Deep Integration</h2>
             <p>To understand an aircraft deeply, we must move beyond viewing it as a mere "collection of parts" and analyze it through the lens of <strong>Hierarchical Systems Architecture</strong>. A modern airliner is essentially a flying data center wrapped in <span class="physics-term" data-definition="Lightweight, high-strength metals resistant to extreme temperatures and corrosion.">Aerospace-Grade Titanium</span> and <span class="physics-term" data-definition="Materials made from two or more constituent materials with significantly different physical or chemical properties.">Carbon-Fiber Composites</span>.</p>
