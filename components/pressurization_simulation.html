@@ -1,0 +1,404 @@
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body,html{background:#08131e;color:#e0f0f4;font-family:'DM Sans',sans-serif}
+  .sim{background:#08131e;padding:1.5rem;min-height:500px}
+  .sim-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:600;letter-spacing:.12em;color:#3a6a7a;text-transform:uppercase;margin-bottom:1.25rem}
+
+  /* === AIRCRAFT CROSS-SECTION === */
+  .aircraft-view{position:relative;width:100%;height:220px;margin-bottom:1.25rem}
+  #plane-svg{width:100%;height:100%}
+
+  /* === FLOW LABELS === */
+  .flow-labels{display:flex;gap:.75rem;margin-bottom:1.25rem}
+  .flow-label{flex:1;background:#0d1e2d;border:1px solid rgba(0,224,188,0.1);border-radius:8px;padding:.65rem 1rem}
+  .fl-name{font-size:10px;letter-spacing:.08em;color:#3a6a7a;text-transform:uppercase;margin-bottom:3px}
+  .fl-val{font-family:'DM Mono',monospace;font-size:18px;font-weight:500;color:#00e0bc}
+  .fl-val.hot{color:#ff6040}
+  .fl-val.warn{color:#ffc040}
+  .fl-unit{font-size:11px;color:#3a6a7a;margin-left:2px}
+
+  /* === CONTROLS === */
+  .controls{display:flex;gap:.75rem;align-items:stretch;margin-bottom:1.25rem}
+  .ctrl-btn{flex:1;background:#0d1e2d;border:1px solid rgba(0,224,188,0.18);border-radius:8px;padding:.6rem .5rem;font-family:'DM Sans',sans-serif;font-size:12px;color:#7abccc;cursor:pointer;transition:all .15s;text-align:center}
+  .ctrl-btn:hover{border-color:rgba(0,224,188,0.4);color:#c0eaf0}
+  .ctrl-btn.active{background:rgba(0,224,188,0.1);border-color:#00e0bc;color:#00e0bc}
+  .ctrl-btn.danger{border-color:rgba(255,60,40,0.3);color:#ff8070}
+  .ctrl-btn.danger:hover{border-color:rgba(255,60,40,0.6);color:#ff5040}
+  .ctrl-btn.danger.active{background:rgba(255,60,40,0.1);border-color:#ff4030;color:#ff4030}
+
+  /* === EVENT LOG === */
+  .event-log{background:#040d14;border:1px solid rgba(0,224,188,0.08);border-radius:8px;padding:.75rem 1rem;height:68px;overflow:hidden;position:relative}
+  .log-line{font-family:'DM Mono',monospace;font-size:11px;color:#3a6a7a;line-height:1.7;transition:color .3s}
+  .log-line.new{color:#00e0bc}
+  .log-line.warn{color:#ffc040}
+  .log-line.alert{color:#ff6040}
+
+  /* Particle canvas */
+  #particle-canvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+</style>
+
+<div class="sim">
+  <div class="sim-title">Cabin Pressurization — Live Simulation</div>
+
+  <div class="aircraft-view">
+    <svg id="plane-svg" viewBox="0 0 760 220" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="fuselage-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#152535"/>
+          <stop offset="100%" stop-color="#0d1b28"/>
+        </linearGradient>
+        <linearGradient id="engine-grad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#0a1a28"/>
+          <stop offset="100%" stop-color="#1a3040"/>
+        </linearGradient>
+        <clipPath id="cabin-clip">
+          <ellipse cx="380" cy="110" rx="265" ry="72"/>
+        </clipPath>
+        <filter id="glow-teal">
+          <feGaussianBlur stdDeviation="3" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
+      <!-- Sky gradient bg -->
+      <rect x="0" y="0" width="760" height="220" fill="#08131e"/>
+      <!-- altitude hint lines -->
+      <line x1="0" y1="40" x2="760" y2="40" stroke="rgba(0,80,100,0.15)" stroke-width="1" stroke-dasharray="4,12"/>
+      <text x="10" y="36" font-family="DM Mono,monospace" font-size="9" fill="rgba(0,120,150,0.4)">35,000 ft</text>
+
+      <!-- FUSELAGE -->
+      <ellipse cx="380" cy="110" rx="275" ry="76" fill="url(#fuselage-grad)" stroke="#1e3a50" stroke-width="1.5"/>
+      <!-- cabin fill — color driven by JS -->
+      <ellipse id="cabin-fill" cx="380" cy="110" rx="260" ry="68" fill="rgba(0,180,140,0.06)"/>
+      <!-- pressure indicator ring -->
+      <ellipse id="pressure-ring" cx="380" cy="110" rx="263" ry="71" fill="none" stroke="rgba(0,224,188,0.25)" stroke-width="1.5"/>
+      <!-- windows -->
+      <g id="windows" opacity="0.9">
+        <rect x="175" y="96" width="18" height="12" rx="5" fill="#0a2030" stroke="#1e4a60" stroke-width="1"/>
+        <rect x="213" y="96" width="18" height="12" rx="5" fill="#0a2030" stroke="#1e4a60" stroke-width="1"/>
+        <rect x="251" y="96" width="18" height="12" rx="5" fill="#0a2030" stroke="#1e4a60" stroke-width="1"/>
+        <rect x="289" y="96" width="18" height="12" rx="5" fill="#0a2030" stroke="#1e4a60" stroke-width="1"/>
+        <rect x="327" y="96" width="18" height="12" rx="5" fill="#0a2030" stroke="#1e4a60" stroke-width="1"/>
+        <rect x="365" y="96" width="18" height="12" rx="5" fill="#0a2030" stroke="#1e4a60" stroke-width="1"/>
+        <rect x="403" y="96" width="18" height="12" rx="5" fill="#0a2030" stroke="#1e4a60" stroke-width="1"/>
+        <rect x="441" y="96" width="18" height="12" rx="5" fill="#0a2030" stroke="#1e4a60" stroke-width="1"/>
+        <rect x="479" y="96" width="18" height="12" rx="5" fill="#0a2030" stroke="#1e4a60" stroke-width="1"/>
+        <rect x="517" y="96" width="18" height="12" rx="5" fill="#0a2030" stroke="#1e4a60" stroke-width="1"/>
+      </g>
+      <!-- wing stub -->
+      <polygon points="290,130 470,130 500,170 260,170" fill="#0f2535" stroke="#1a3348" stroke-width="1"/>
+      <!-- ENGINE LEFT -->
+      <rect x="240" y="158" width="120" height="36" rx="10" fill="url(#engine-grad)" stroke="#1e3a50" stroke-width="1.5"/>
+      <!-- engine intake spin -->
+      <g id="engine-spin" transform-origin="270 176">
+        <circle cx="270" cy="176" r="13" fill="#0a1825" stroke="#1e3a50" stroke-width="1"/>
+        <line x1="270" y1="163" x2="270" y2="189" stroke="#2a5068" stroke-width="2" stroke-linecap="round"/>
+        <line x1="257" y1="176" x2="283" y2="176" stroke="#2a5068" stroke-width="2" stroke-linecap="round"/>
+        <line x1="261" y1="167" x2="279" y2="185" stroke="#1a3a50" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="279" y1="167" x2="261" y2="185" stroke="#1a3a50" stroke-width="1.5" stroke-linecap="round"/>
+      </g>
+      <text x="300" y="180" font-family="DM Sans,sans-serif" font-size="9" fill="#2a6078">ENGINE / PACK</text>
+      <!-- ENGINE RIGHT -->
+      <rect x="400" y="158" width="120" height="36" rx="10" fill="url(#engine-grad)" stroke="#1e3a50" stroke-width="1.5"/>
+      <g id="engine-spin2" transform-origin="430 176">
+        <circle cx="430" cy="176" r="13" fill="#0a1825" stroke="#1e3a50" stroke-width="1"/>
+        <line x1="430" y1="163" x2="430" y2="189" stroke="#2a5068" stroke-width="2" stroke-linecap="round"/>
+        <line x1="417" y1="176" x2="443" y2="176" stroke="#2a5068" stroke-width="2" stroke-linecap="round"/>
+        <line x1="421" y1="167" x2="439" y2="185" stroke="#1a3a50" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="439" y1="167" x2="421" y2="185" stroke="#1a3a50" stroke-width="1.5" stroke-linecap="round"/>
+      </g>
+
+      <!-- BLEED DUCTS (engine → cabin) -->
+      <path id="duct-l" d="M270,163 Q270,130 300,118" fill="none" stroke="rgba(255,80,40,0)" stroke-width="2.5" stroke-dasharray="5,4"/>
+      <path id="duct-r" d="M430,163 Q430,130 460,118" fill="none" stroke="rgba(255,80,40,0)" stroke-width="2.5" stroke-dasharray="5,4"/>
+
+      <!-- OUTFLOW VALVE (rear) -->
+      <g id="outflow-group">
+        <rect x="624" y="98" width="14" height="24" rx="3" fill="#0d1e2d" stroke="#1e3a50" stroke-width="1.2"/>
+        <rect id="valve-indicator" x="626" y="100" width="10" height="20" rx="2" fill="rgba(0,224,188,0.15)" stroke="rgba(0,224,188,0.4)" stroke-width="1"/>
+        <text x="642" y="108" font-family="DM Mono,monospace" font-size="8" fill="#3a6a7a">OUTFLOW</text>
+        <text x="642" y="118" font-family="DM Mono,monospace" font-size="8" fill="#3a6a7a">VALVE</text>
+        <text id="valve-pct" x="642" y="128" font-family="DM Mono,monospace" font-size="9" fill="#00e0bc">18%</text>
+      </g>
+
+      <!-- PRESSURE DIFFERENTIAL label -->
+      <text id="diff-label" x="380" y="170" text-anchor="middle" font-family="DM Mono,monospace" font-size="9" fill="rgba(0,180,140,0.5)">ΔP = 8.2 psi</text>
+
+      <!-- CABIN ALTITUDE GAUGE -->
+      <g>
+        <rect x="18" y="68" width="88" height="44" rx="6" fill="#0d1e2d" stroke="rgba(0,224,188,0.12)" stroke-width="1"/>
+        <text x="62" y="83" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="8" fill="#3a6a7a">CABIN ALT</text>
+        <text id="cabin-alt-label" x="62" y="100" text-anchor="middle" font-family="DM Mono,monospace" font-size="15" font-weight="500" fill="#00e0bc">7,200 ft</text>
+      </g>
+
+      <!-- BLEED TEMP label -->
+      <text id="bleed-label" x="362" y="88" text-anchor="middle" font-family="DM Mono,monospace" font-size="9" fill="rgba(255,80,40,0)">BLEED 400°C → 21°C</text>
+    </svg>
+    <canvas id="particle-canvas"></canvas>
+  </div>
+
+  <!-- LIVE READOUTS -->
+  <div class="flow-labels">
+    <div class="flow-label">
+      <div class="fl-name">Cabin Altitude</div>
+      <div><span class="fl-val" id="rd-cabalt">7,200</span><span class="fl-unit">ft</span></div>
+    </div>
+    <div class="flow-label">
+      <div class="fl-name">Cabin Pressure</div>
+      <div><span class="fl-val" id="rd-psi">10.9</span><span class="fl-unit">psi</span></div>
+    </div>
+    <div class="flow-label">
+      <div class="fl-name">Bleed Air Temp</div>
+      <div><span class="fl-val hot" id="rd-temp">400</span><span class="fl-unit">°C</span></div>
+    </div>
+    <div class="flow-label">
+      <div class="fl-name">Outflow Valve</div>
+      <div><span class="fl-val" id="rd-valve">18</span><span class="fl-unit">% open</span></div>
+    </div>
+    <div class="flow-label">
+      <div class="fl-name">Pack Output</div>
+      <div><span class="fl-val" id="rd-pack">21</span><span class="fl-unit">°C</span></div>
+    </div>
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="controls">
+    <div class="ctrl-btn active" id="btn-normal" onclick="setMode('normal')">✦ Normal cruise</div>
+    <div class="ctrl-btn" id="btn-climb" onclick="setMode('climb')">↑ Climbing</div>
+    <div class="ctrl-btn" id="btn-descent" onclick="setMode('descent')">↓ Descending</div>
+    <div class="ctrl-btn danger" id="btn-blowout" onclick="setMode('blowout')">⚠ Outflow failure</div>
+    <div class="ctrl-btn danger" id="btn-depress" onclick="setMode('depress')">⚠ Rapid depress</div>
+  </div>
+
+  <!-- EVENT LOG -->
+  <div class="event-log" id="event-log">
+    <div class="log-line new" id="log0">[ 00:00 ] System nominal. Bleed air routing via both PACKs.</div>
+    <div class="log-line" id="log1">[ 00:01 ] Outflow valve modulating at 18% — maintaining ΔP 8.2 psi.</div>
+    <div class="log-line" id="log2">[ 00:02 ] Cabin altitude stable at 7,200 ft equivalent.</div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('particle-canvas');
+const ctx = canvas.getContext('2d');
+const svgEl = document.getElementById('plane-svg');
+
+let mode = 'normal';
+let tick = 0;
+let particles = [];
+let spinAngle = 0;
+let logTimer = 0;
+
+const modes = {
+  normal:   { cabinAlt: 7200, psi: 10.9, bleedTemp: 400, packOut: 21, valve: 18, diffP: 8.2, label: 'Normal cruise', logClass: 'new' },
+  climb:    { cabinAlt: 8800, psi: 10.4, bleedTemp: 390, packOut: 19, valve: 12, diffP: 7.1, label: 'Climbing — valve closing to trap pressure', logClass: 'new' },
+  descent:  { cabinAlt: 4200, psi: 12.1, bleedTemp: 410, packOut: 22, valve: 28, diffP: 5.8, label: 'Descending — valve opening to reduce cabin pressure', logClass: 'new' },
+  blowout:  { cabinAlt: 7200, psi: 10.9, bleedTemp: 400, packOut: 21, valve: 100, diffP: 0.2, label: 'FAULT: Outflow valve stuck OPEN — cabin pressure dropping!', logClass: 'alert' },
+  depress:  { cabinAlt: 35000, psi: 3.4, bleedTemp: 0,   packOut: -40, valve: 100, diffP: 0.0, label: 'EMERGENCY: Rapid decompression — masks deployed!', logClass: 'alert' },
+};
+
+let current = { ...modes.normal };
+let target = { ...modes.normal };
+
+function setMode(m) {
+  mode = m;
+  target = { ...modes[m] };
+  document.querySelectorAll('.ctrl-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + m).classList.add('active');
+  addLog(modes[m].label, modes[m].logClass);
+  if (m === 'depress') {
+    document.getElementById('bleed-label').style.fill = 'rgba(255,80,40,0)';
+  }
+}
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function addLog(msg, cls) {
+  const mins = String(Math.floor(tick/60)).padStart(2,'0');
+  const secs = String(tick % 60).padStart(2,'0');
+  const lines = document.querySelectorAll('.log-line');
+  lines[0].textContent = lines[1].textContent;
+  lines[0].className = 'log-line';
+  lines[1].textContent = lines[2].textContent;
+  lines[1].className = 'log-line';
+  lines[2].textContent = `[ ${mins}:${secs} ] ${msg}`;
+  lines[2].className = `log-line ${cls}`;
+}
+
+function resizeCanvas() {
+  const rect = svgEl.parentElement.getBoundingClientRect();
+  canvas.width = rect.width;
+  canvas.height = rect.height;
+}
+
+function spawnParticle() {
+  if (mode === 'depress') return;
+  // Air particles: bleed from engines → cabin
+  const side = Math.random() > 0.5 ? 'L' : 'R';
+  const svgW = 760, svgH = 220;
+  const rect = svgEl.parentElement.getBoundingClientRect();
+  const scaleX = rect.width / svgW;
+  const scaleY = rect.height / svgH;
+  const sx = side === 'L' ? 270 * scaleX : 430 * scaleX;
+  const sy = 163 * scaleY;
+  const ex = (side === 'L' ? 300 : 460) * scaleX;
+  const ey = 118 * scaleY;
+  particles.push({
+    x: sx, y: sy, tx: ex + (Math.random()-0.5)*80*scaleX,
+    ty: ey + (Math.random()-0.5)*40*scaleY,
+    life: 0, maxLife: 60 + Math.random()*30,
+    hot: current.bleedTemp > 100,
+    type: 'bleed'
+  });
+  // Outflow: rear of cabin → outside
+  if (Math.random() < current.valve / 100 * 2) {
+    particles.push({
+      x: 634 * scaleX, y: (100 + Math.random()*20) * scaleY,
+      tx: (680 + Math.random()*40) * scaleX,
+      ty: (60 + Math.random()*80) * scaleY,
+      life: 0, maxLife: 50,
+      hot: false, type: 'outflow'
+    });
+  }
+}
+
+function drawParticles() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (mode === 'depress') {
+    // Big burst outward
+    particles.forEach(p => {
+      if (p.type !== 'burst') return;
+      const prog = p.life / p.maxLife;
+      ctx.beginPath();
+      ctx.arc(p.x + (p.tx-p.x)*prog, p.y + (p.ty-p.y)*prog, 2.5*(1-prog), 0, Math.PI*2);
+      ctx.fillStyle = `rgba(255,180,100,${0.8*(1-prog)})`;
+      ctx.fill();
+      p.life++;
+    });
+    particles = particles.filter(p => p.life < p.maxLife);
+    if (Math.random() < 0.3) {
+      const rect = svgEl.parentElement.getBoundingClientRect();
+      const cx = rect.width * 0.5, cy = rect.height * 0.5;
+      const angle = Math.random() * Math.PI * 2;
+      particles.push({ x: cx, y: cy, tx: cx + Math.cos(angle)*200, ty: cy + Math.sin(angle)*100, life: 0, maxLife: 60, type: 'burst' });
+    }
+    return;
+  }
+  particles.forEach(p => {
+    const prog = p.life / p.maxLife;
+    const px = p.x + (p.tx - p.x) * prog;
+    const py = p.y + (p.ty - p.y) * prog;
+    const alpha = prog < 0.2 ? prog/0.2 : 1 - (prog - 0.2)/0.8;
+    const color = p.type === 'outflow'
+      ? `rgba(100,200,220,${alpha * 0.7})`
+      : (p.hot ? `rgba(255,${120+Math.floor(60*prog)},60,${alpha*0.8})` : `rgba(0,220,180,${alpha*0.6})`);
+    ctx.beginPath();
+    ctx.arc(px, py, 2.2, 0, Math.PI*2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    p.life++;
+  });
+  particles = particles.filter(p => p.life < p.maxLife);
+}
+
+function updateReadouts() {
+  const spd = 0.03;
+  current.cabinAlt = lerp(current.cabinAlt, target.cabinAlt, spd);
+  current.psi = lerp(current.psi, target.psi, spd);
+  current.bleedTemp = lerp(current.bleedTemp, target.bleedTemp, spd);
+  current.packOut = lerp(current.packOut, target.packOut, spd);
+  current.valve = lerp(current.valve, target.valve, spd);
+  current.diffP = lerp(current.diffP, target.diffP, spd);
+
+  const cabAlt = Math.round(current.cabinAlt);
+  const valvePct = Math.round(current.valve);
+
+  document.getElementById('rd-cabalt').textContent = cabAlt.toLocaleString();
+  document.getElementById('rd-psi').textContent = current.psi.toFixed(1);
+  document.getElementById('rd-temp').textContent = Math.round(current.bleedTemp);
+  document.getElementById('rd-valve').textContent = valvePct;
+  document.getElementById('rd-pack').textContent = Math.round(current.packOut);
+
+  document.getElementById('cabin-alt-label').textContent = cabAlt.toLocaleString() + ' ft';
+  document.getElementById('valve-pct').textContent = valvePct + '%';
+  document.getElementById('diff-label').textContent = 'ΔP = ' + current.diffP.toFixed(1) + ' psi';
+
+  // Cabin fill color by pressure
+  const danger = mode === 'depress' || mode === 'blowout';
+  const fillAlpha = danger ? 0.0 : Math.min(0.12, current.psi / 100);
+  document.getElementById('cabin-fill').setAttribute('fill', danger
+    ? 'rgba(255,60,40,0.05)'
+    : `rgba(0,180,140,${fillAlpha})`);
+
+  // Pressure ring pulse
+  const ring = document.getElementById('pressure-ring');
+  if (danger) {
+    ring.setAttribute('stroke', 'rgba(255,60,40,0.5)');
+  } else {
+    ring.setAttribute('stroke', 'rgba(0,224,188,0.2)');
+  }
+
+  // Valve indicator height
+  const valveH = Math.round(valvePct / 100 * 20);
+  const valveRect = document.getElementById('valve-indicator');
+  valveRect.setAttribute('height', Math.max(1, valveH));
+  valveRect.setAttribute('y', 120 - valveH);
+  valveRect.setAttribute('fill', valvePct > 60 ? 'rgba(255,80,40,0.3)' : 'rgba(0,224,188,0.15)');
+  valveRect.setAttribute('stroke', valvePct > 60 ? 'rgba(255,80,40,0.6)' : 'rgba(0,224,188,0.4)');
+
+  // Bleed duct visibility
+  const ductAlpha = mode === 'depress' ? 0 : 0.7;
+  document.getElementById('duct-l').setAttribute('stroke', `rgba(255,80,40,${ductAlpha})`);
+  document.getElementById('duct-r').setAttribute('stroke', `rgba(255,80,40,${ductAlpha})`);
+  document.getElementById('bleed-label').setAttribute('fill', mode === 'depress' ? 'rgba(255,80,40,0)' : 'rgba(255,120,60,0.55)');
+
+  // Window color
+  const winColor = danger ? '#1a0a08' : (cabAlt > 12000 ? '#080e18' : '#0a2030');
+  document.querySelectorAll('#windows rect').forEach(w => w.setAttribute('fill', winColor));
+}
+
+function spinEngines() {
+  spinAngle += 8;
+  const s1 = document.getElementById('engine-spin');
+  const s2 = document.getElementById('engine-spin2');
+  s1.setAttribute('transform', `rotate(${spinAngle}, 270, 176)`);
+  s2.setAttribute('transform', `rotate(${spinAngle}, 430, 176)`);
+}
+
+function autoLog() {
+  logTimer++;
+  if (logTimer % 120 === 0 && mode === 'normal') {
+    const msgs = [
+      'Outflow valve modulating — cabin pressure nominal.',
+      'Both PACKs delivering conditioned air at 21°C.',
+      'Bleed air cooled from 400°C → cabin temp via ACM.',
+      'Cabin altitude stable. Differential pressure 8.2 psi.',
+      'Air refresh cycle complete. 50% recirculated via HEPA.',
+    ];
+    addLog(msgs[Math.floor(Math.random()*msgs.length)], '');
+  }
+  if (logTimer % 80 === 0 && (mode === 'blowout' || mode === 'depress')) {
+    const msgs = mode === 'blowout'
+      ? ['WARN: Valve position sensor fault — manual override suggested.','ALERT: Cabin altitude climbing. Crew notified.']
+      : ['EMERGENCY: Oxygen masks deployed.','ALERT: Emergency descent initiated. Target 10,000 ft.'];
+    addLog(msgs[Math.floor(Math.random()*msgs.length)], mode === 'depress' ? 'alert' : 'warn');
+  }
+}
+
+function loop() {
+  tick++;
+  resizeCanvas();
+  if (tick % 3 === 0) spawnParticle();
+  drawParticles();
+  updateReadouts();
+  spinEngines();
+  autoLog();
+  requestAnimationFrame(loop);
+}
+
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+loop();
+</script>
