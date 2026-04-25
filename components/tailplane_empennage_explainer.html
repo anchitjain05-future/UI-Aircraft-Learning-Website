@@ -1,0 +1,414 @@
+
+<style>
+#wrap { font-family: var(--font-sans, sans-serif); }
+.tab-bar { display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap; justify-content: center;}
+.tab-btn {
+  background:#112233; border:1px solid #1a3a55; color:#7a9bb5;
+  border-radius:8px; padding:8px 18px; font-size:13px; cursor:pointer; transition:all .2s;
+}
+.tab-btn:hover { background:#1a3a55; color:#fff; }
+.tab-btn.active { background:#00e5ff18; border-color:#00e5ff88; color:#00e5ff; }
+.panel { display:none; }
+.panel.active { display:block; }
+canvas { display:block; margin: 0 auto; border-radius:10px; background:#0d1b2a; max-width:100%; }
+
+.info-box {
+  margin-top:14px; background:#112233; border:1px solid #1a3a55;
+  border-radius:10px; padding:14px 16px;
+}
+.info-box h3 { color:#00e5ff; font-size:14px; font-weight:500; margin-bottom:6px; }
+.info-box p { color:#a8c8e0; font-size:12px; line-height:1.65; }
+.toggle-row {
+  display:flex; align-items:center; gap:14px; margin-top:14px;
+  justify-content:center; flex-wrap:wrap;
+}
+.big-btn {
+  border:1px solid #1a3a55; border-radius:8px; padding:9px 22px;
+  font-size:13px; cursor:pointer; transition:all .2s; font-family:inherit;
+}
+.big-btn.danger { background:#ff2a2a22; border-color:#ff2a2a88; color:#ff6b6b; }
+.big-btn.safe  { background:#00e5ff18; border-color:#00e5ff88; color:#00e5ff; }
+.big-btn:hover { opacity:.8; }
+.badge {
+  display:inline-block; border-radius:6px; padding:3px 10px;
+  font-size:11px; font-weight:600; letter-spacing:.04em; text-transform:uppercase;
+}
+.badge.red { background:#ff2a2a22; border:1px solid #ff2a2a66; color:#ff6b6b; }
+.badge.green { background:#00ff9922; border:1px solid #00ff9966; color:#00ff99; }
+</style>
+
+<div id="wrap" style="background:#0d1b2a;border-radius:16px;padding:24px 20px 20px;">
+  <div style="text-align:center;margin-bottom:18px;">
+    <div style="color:#fff;font-size:17px;font-weight:500;letter-spacing:.02em;">The Role of the Tailplane</div>
+    <div style="color:#7a9bb5;font-size:12px;margin-top:4px;">Explore what happens with and without the empennage</div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="showPanel('chaos')">Without tail: Chaos</button>
+    <button class="tab-btn" onclick="showPanel('vert')">Vertical Stabilizer</button>
+    <button class="tab-btn" onclick="showPanel('horiz')">Horizontal Stabilizer</button>
+  </div>
+
+  <!-- PANEL 1: CHAOS / STABLE -->
+  <div class="panel active" id="panel-chaos">
+    <canvas id="c-chaos" width="560" height="240"></canvas>
+    <div class="toggle-row">
+      <span id="badge-chaos" class="badge red">No Tail — Unstable</span>
+      <button class="big-btn danger" id="btn-chaos" onclick="toggleTail()">Add Tail</button>
+    </div>
+    <div class="info-box" id="info-chaos">
+      <h3>Without a tail: pure aerodynamic chaos</h3>
+      <p>With no empennage, the aircraft has nothing to damp side-to-side swings. The nose whips left and right in an uncontrolled spiral called Dutch Roll — and any pitch disturbance sends it tumbling nose-over-tail.</p>
+    </div>
+  </div>
+
+  <!-- PANEL 2: VERTICAL STABILIZER -->
+  <div class="panel" id="panel-vert">
+    <canvas id="c-vert" width="560" height="240"></canvas>
+    <div class="info-box">
+      <h3>Vertical stabilizer — preventing Dutch Roll (yaw)</h3>
+      <p>The large upright fin at the tail acts like the feathers on an arrow. When the nose drifts sideways, the airflow hits the fin and pushes the tail back into alignment — automatically, with no pilot input needed.</p>
+    </div>
+  </div>
+
+  <!-- PANEL 3: HORIZONTAL STABILIZER -->
+  <div class="panel" id="panel-horiz">
+    <canvas id="c-horiz" width="560" height="240"></canvas>
+    <div class="info-box">
+      <h3>Horizontal stabilizer — the downforce surprise</h3>
+      <p>On most airliners the horizontal stabilizer pushes the tail <strong>down</strong>, not up. Because engines and fuel make the nose naturally heavy, the stabilizer acts like a see-saw — constantly pressing down on the tail to keep the nose level.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+let tailOn = false;
+let raf = {};
+let ticks = { chaos:0, vert:0, horiz:0 };
+
+function showPanel(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+/* ── shared draw helpers ───────────────────────────── */
+function clearC(ctx, w, h) {
+  ctx.fillStyle = '#0d1b2a';
+  ctx.fillRect(0, 0, w, h);
+}
+
+function drawPlaneBase(ctx, cx, cy, bodyAngle, tailVisible, chaosMode, t) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(bodyAngle);
+
+  // fuselage
+  ctx.fillStyle = '#1e3a5a'; ctx.strokeStyle = '#2a5a8a'; ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 95, 15, 0, 0, Math.PI*2);
+  ctx.fill(); ctx.stroke();
+
+  // nose
+  ctx.fillStyle = '#254a70';
+  ctx.beginPath();
+  ctx.moveTo(95,-8); ctx.bezierCurveTo(118,-6,120,6,95,8); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // wings
+  ctx.fillStyle = '#163050'; ctx.strokeStyle = '#2a5a8a'; ctx.lineWidth=1.2;
+  ctx.beginPath();
+  ctx.moveTo(-10,-15); ctx.lineTo(15,-15); ctx.lineTo(20,-70); ctx.lineTo(-15,-68); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-10,15); ctx.lineTo(15,15); ctx.lineTo(20,70); ctx.lineTo(-15,68); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // engines
+  ctx.fillStyle='#1a3555'; ctx.strokeStyle='#2a5a8a'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.ellipse(-5,-44,14,5,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(-5,44,14,5,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+
+  // TAIL GROUP
+  if (tailVisible) {
+    ctx.fillStyle = '#00e5ff33'; ctx.strokeStyle = '#00e5ff'; ctx.lineWidth=1.2;
+    // vertical stab
+    ctx.beginPath();
+    ctx.moveTo(-95,-15); ctx.lineTo(-80,-15); ctx.lineTo(-75,-50); ctx.lineTo(-95,-48); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    // horiz stabs
+    ctx.beginPath();
+    ctx.moveTo(-95,-15); ctx.lineTo(-65,-15); ctx.lineTo(-58,-38); ctx.lineTo(-95,-36); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-95,15); ctx.lineTo(-65,15); ctx.lineTo(-58,38); ctx.lineTo(-95,36); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+  } else {
+    // ghost stub of missing tail
+    ctx.fillStyle = '#ff2a2a11'; ctx.strokeStyle='#ff6b6b44'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+    ctx.beginPath();
+    ctx.moveTo(-95,-15); ctx.lineTo(-80,-15); ctx.lineTo(-75,-50); ctx.lineTo(-95,-48); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-95,-15); ctx.lineTo(-65,-15); ctx.lineTo(-58,-38); ctx.lineTo(-95,-36); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-95,15); ctx.lineTo(-65,15); ctx.lineTo(-58,38); ctx.lineTo(-95,36); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  ctx.restore();
+}
+
+/* ── CHAOS panel ───────────────────────────────────── */
+const canvasChaos = document.getElementById('c-chaos');
+const ctxCh = canvasChaos.getContext('2d');
+const W=560, H=240, cx=W/2, cy=H/2;
+
+function drawChaos(t) {
+  clearC(ctxCh, W, H);
+
+  let angle, posX, posY;
+  if (!tailOn) {
+    // Dutch roll: yaw + slight displacement
+    angle = Math.sin(t*1.3)*0.38 + Math.cos(t*0.7)*0.18;
+    posX  = cx + Math.sin(t*1.1)*28;
+    posY  = cy + Math.sin(t*0.9)*20;
+
+    // turbulence lines
+    ctxCh.strokeStyle='#ff6b6b33'; ctxCh.lineWidth=1; ctxCh.setLineDash([4,4]);
+    for(let i=0;i<6;i++){
+      ctxCh.beginPath();
+      ctxCh.moveTo(40+i*90, 10+Math.sin(t+i)*30);
+      ctxCh.bezierCurveTo(40+i*90+30, 60+Math.cos(t+i)*20, 40+i*90+60, 40+Math.sin(t*1.2+i)*25, 40+i*90+90, H-20);
+      ctxCh.stroke();
+    }
+    ctxCh.setLineDash([]);
+
+    // warning label
+    ctxCh.fillStyle='#ff6b6b';
+    ctxCh.font='bold 11px Segoe UI, sans-serif';
+    ctxCh.textAlign='center';
+    ctxCh.fillText('⚠ DUTCH ROLL — UNCONTROLLED', cx, 22);
+
+  } else {
+    // stable: gentle level cruise
+    angle = Math.sin(t*0.4)*0.015;
+    posX  = cx;
+    posY  = cy;
+
+    // smooth airflow lines
+    ctxCh.strokeStyle='#00e5ff22'; ctxCh.lineWidth=1; ctxCh.setLineDash([5,5]);
+    ctxCh.strokeStyle='#00e5ff22';
+    for(let i=0;i<5;i++){
+      const yy = 30 + i*44;
+      ctxCh.beginPath();
+      ctxCh.moveTo(20, yy);
+      ctxCh.bezierCurveTo(180, yy-5, 380, yy+5, W-20, yy);
+      ctxCh.stroke();
+    }
+    ctxCh.setLineDash([]);
+
+    ctxCh.fillStyle='#00e5ff';
+    ctxCh.font='bold 11px Segoe UI, sans-serif';
+    ctxCh.textAlign='center';
+    ctxCh.fillText('STABLE — TAIL PROVIDING CORRECTION', cx, 22);
+  }
+
+  drawPlaneBase(ctxCh, posX, posY, angle, tailOn, true, t);
+
+  // airflow over tail when stable
+  if(tailOn) {
+    const r = 60;
+    const phase = (t * 0.5) % (Math.PI*2);
+    ctxCh.save();
+    ctxCh.translate(posX, posY);
+    ctxCh.rotate(angle);
+    ctxCh.setLineDash([4,4]);
+    ctxCh.strokeStyle='#00e5ffaa'; ctxCh.lineWidth=1;
+    ctxCh.beginPath();
+    ctxCh.moveTo(-155, 0); ctxCh.lineTo(-95, 0);
+    ctxCh.stroke();
+    // small arrow
+    ctxCh.setLineDash([]);
+    ctxCh.beginPath();
+    ctxCh.moveTo(-100, -4); ctxCh.lineTo(-95, 0); ctxCh.lineTo(-100, 4);
+    ctxCh.strokeStyle='#00e5ff'; ctxCh.lineWidth=1.5; ctxCh.stroke();
+    ctxCh.restore();
+  }
+
+  ticks.chaos = raf.chaos = requestAnimationFrame(() => drawChaos(t + 0.025));
+}
+
+function toggleTail() {
+  tailOn = !tailOn;
+  document.getElementById('btn-chaos').textContent = tailOn ? 'Remove Tail' : 'Add Tail';
+  document.getElementById('btn-chaos').className = tailOn ? 'big-btn safe' : 'big-btn danger';
+  document.getElementById('badge-chaos').textContent = tailOn ? 'Tail On — Stable' : 'No Tail — Unstable';
+  document.getElementById('badge-chaos').className = tailOn ? 'badge green' : 'badge red';
+  const i = document.getElementById('info-chaos');
+  if(tailOn) {
+    i.querySelector('h3').textContent = 'With a tail: stability restored';
+    i.querySelector('p').textContent = 'The empennage immediately damps the oscillations. The vertical stabilizer kills the yaw, the horizontal stabilizer corrects any pitch. The aircraft settles into smooth, level flight.';
+  } else {
+    i.querySelector('h3').textContent = 'Without a tail: pure aerodynamic chaos';
+    i.querySelector('p').textContent = 'With no empennage, the aircraft has nothing to damp side-to-side swings. The nose whips left and right in an uncontrolled spiral called Dutch Roll — and any pitch disturbance sends it tumbling nose-over-tail.';
+  }
+}
+
+/* ── VERTICAL STAB panel ───────────────────────────── */
+const canvasVert = document.getElementById('c-vert');
+const ctxV = canvasVert.getContext('2d');
+let yawOffset = 0;
+let yawTarget = 0;
+let correcting = false;
+let lastYawTrigger = 0;
+
+function drawVert(t) {
+  clearC(ctxV, W, H);
+
+  // trigger a yaw disturbance periodically
+  if(t - lastYawTrigger > 5.5) {
+    lastYawTrigger = t;
+    yawTarget = (Math.random()>0.5?1:-1) * (0.22 + Math.random()*0.12);
+    correcting = false;
+  }
+  // yaw damps back
+  if(!correcting && Math.abs(yawOffset - yawTarget) > 0.01) {
+    yawOffset += (yawTarget - yawOffset) * 0.06;
+    if(Math.abs(yawOffset - yawTarget) < 0.02) correcting = true;
+  } else {
+    yawOffset += (0 - yawOffset) * 0.04; // stabilizer brings back to 0
+  }
+
+  // smooth airflow
+  ctxV.strokeStyle='#00e5ff18'; ctxV.lineWidth=1; ctxV.setLineDash([5,5]);
+  for(let i=0;i<5;i++){
+    const yy=28+i*44;
+    ctxV.beginPath(); ctxV.moveTo(20,yy); ctxV.bezierCurveTo(180,yy-4,380,yy+4,W-20,yy); ctxV.stroke();
+  }
+  ctxV.setLineDash([]);
+
+  drawPlaneBase(ctxV, cx+yawOffset*100, cy, yawOffset, true, false, t);
+
+  // annotate yaw force on fin
+  if(Math.abs(yawOffset) > 0.04) {
+    ctxV.save();
+    ctxV.translate(cx+yawOffset*100, cy);
+    ctxV.rotate(yawOffset);
+    // arrow showing correction force on fin
+    const dir = yawOffset>0 ? 1 : -1;
+    ctxV.strokeStyle='#00e5ff'; ctxV.lineWidth=2; ctxV.setLineDash([]);
+    ctxV.beginPath();
+    ctxV.moveTo(-95, -50); ctxV.lineTo(-95 + dir*28, -50);
+    ctxV.stroke();
+    ctxV.beginPath();
+    ctxV.moveTo(-95 + dir*28, -56); ctxV.lineTo(-95 + dir*28, -44); ctxV.lineTo(-95 + dir*36, -50);
+    ctxV.fillStyle='#00e5ff'; ctxV.fill();
+    // label
+    ctxV.font='11px Segoe UI,sans-serif'; ctxV.fillStyle='#00e5ff'; ctxV.textAlign='center';
+    ctxV.fillText('correction', -95+dir*20, -62);
+    ctxV.restore();
+  }
+
+  // label
+  ctxV.fillStyle='#7a9bb5'; ctxV.font='11px Segoe UI,sans-serif'; ctxV.textAlign='left';
+  ctxV.fillText('Watch: yaw disturbances are auto-corrected by the fin', 20, H-14);
+
+  raf.vert = requestAnimationFrame(() => drawVert(t + 0.02));
+}
+
+/* ── HORIZ STAB panel ───────────────────────────────── */
+const canvasHoriz = document.getElementById('c-horiz');
+const ctxH = canvasHoriz.getContext('2d');
+
+function drawHoriz(t) {
+  clearC(ctxH, W, H);
+
+  // side view of airplane, showing CG, CL, and tail downforce
+  const px = cx + 20, py = cy - 10;
+  const pitch = Math.sin(t*0.5)*0.06;
+
+  ctxH.save();
+  ctxH.translate(px, py);
+  ctxH.rotate(pitch);
+
+  // fuselage
+  ctxH.fillStyle='#1e3a5a'; ctxH.strokeStyle='#2a5a8a'; ctxH.lineWidth=1.2;
+  ctxH.beginPath(); ctxH.ellipse(0,0,105,14,0,0,Math.PI*2); ctxH.fill(); ctxH.stroke();
+
+  // nose
+  ctxH.fillStyle='#254a70';
+  ctxH.beginPath(); ctxH.moveTo(105,-8); ctxH.bezierCurveTo(128,-6,130,6,105,8); ctxH.closePath(); ctxH.fill(); ctxH.stroke();
+
+  // wing (side view)
+  ctxH.fillStyle='#163050'; ctxH.strokeStyle='#2a5a8a'; ctxH.lineWidth=1.2;
+  ctxH.beginPath(); ctxH.moveTo(-15,-14); ctxH.lineTo(20,-14); ctxH.lineTo(28,-55); ctxH.lineTo(-15,-52); ctxH.closePath(); ctxH.fill(); ctxH.stroke();
+
+  // tail assembly
+  ctxH.fillStyle='#00e5ff33'; ctxH.strokeStyle='#00e5ff'; ctxH.lineWidth=1.2;
+  // horiz stab
+  ctxH.beginPath(); ctxH.moveTo(-105,-14); ctxH.lineTo(-75,-14); ctxH.lineTo(-68,-36); ctxH.lineTo(-105,-34); ctxH.closePath(); ctxH.fill(); ctxH.stroke();
+  // vert stab
+  ctxH.beginPath(); ctxH.moveTo(-105,-14); ctxH.lineTo(-95,-14); ctxH.lineTo(-90,-46); ctxH.lineTo(-105,-44); ctxH.closePath(); ctxH.fill(); ctxH.stroke();
+
+  // engine
+  ctxH.fillStyle='#1a3555'; ctxH.strokeStyle='#2a5a8a'; ctxH.lineWidth=1;
+  ctxH.beginPath(); ctxH.ellipse(-5,-36,16,5,0,0,Math.PI*2); ctxH.fill(); ctxH.stroke();
+
+  // DOWNFORCE arrow on tail
+  const dfAnim = 0.6 + Math.sin(t*2)*0.2;
+  ctxH.strokeStyle='#ff6b6b'; ctxH.lineWidth=2; ctxH.setLineDash([]);
+  ctxH.beginPath(); ctxH.moveTo(-88,-14); ctxH.lineTo(-88,-14+dfAnim*22); ctxH.stroke();
+  ctxH.beginPath();
+  ctxH.moveTo(-94,-14+dfAnim*22); ctxH.lineTo(-88,-14+dfAnim*28); ctxH.lineTo(-82,-14+dfAnim*22);
+  ctxH.fillStyle='#ff6b6b'; ctxH.fill();
+
+  // CG marker (front-heavy)
+  ctxH.beginPath(); ctxH.arc(30, 0, 7, 0, Math.PI*2);
+  ctxH.fillStyle='#ffaa00aa'; ctxH.fill();
+  ctxH.strokeStyle='#ffaa00'; ctxH.lineWidth=1.5; ctxH.stroke();
+
+  // CL marker (wing centre of lift)
+  ctxH.beginPath(); ctxH.arc(0, -14, 6, 0, Math.PI*2);
+  ctxH.fillStyle='#00e5ff55'; ctxH.fill();
+  ctxH.strokeStyle='#00e5ff'; ctxH.lineWidth=1.5; ctxH.stroke();
+
+  ctxH.restore();
+
+  // labels outside the plane
+  ctxH.font='11px Segoe UI,sans-serif'; ctxH.textAlign='left';
+
+  // CG label
+  ctxH.fillStyle='#ffaa00';
+  ctxH.fillText('CG (nose heavy)', px+52, py+30);
+  ctxH.strokeStyle='#ffaa0066'; ctxH.lineWidth=0.8; ctxH.setLineDash([3,3]);
+  ctxH.beginPath(); ctxH.moveTo(px+30,py); ctxH.lineTo(px+50,py+26); ctxH.stroke();
+  ctxH.setLineDash([]);
+
+  // CL label
+  ctxH.fillStyle='#00e5ff';
+  ctxH.fillText('Centre of lift (wings)', px+22, py-52);
+  ctxH.strokeStyle='#00e5ff66'; ctxH.lineWidth=0.8; ctxH.setLineDash([3,3]);
+  ctxH.beginPath(); ctxH.moveTo(px,py-14); ctxH.lineTo(px+20,py-50); ctxH.stroke();
+  ctxH.setLineDash([]);
+
+  // downforce label
+  ctxH.fillStyle='#ff6b6b';
+  ctxH.fillText('↓ tail pushes DOWN', px-170, py+50);
+
+  // see-saw explanation
+  ctxH.fillStyle='#7a9bb5'; ctxH.textAlign='center';
+  ctxH.font='11px Segoe UI,sans-serif';
+  ctxH.fillText('The tail acts like a see-saw: downforce on tail keeps nose-heavy aircraft level', cx, H-14);
+
+  raf.horiz = requestAnimationFrame(() => drawHoriz(t + 0.022));
+}
+
+// kick off all loops
+drawChaos(0);
+drawVert(0);
+drawHoriz(0);
+</script>

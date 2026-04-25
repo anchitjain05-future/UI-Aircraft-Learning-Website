@@ -1,0 +1,499 @@
+
+<style>
+#lg-wrap { font-family:'Segoe UI',sans-serif; background:#0d1b2a; border-radius:16px; padding:24px 20px 20px; }
+.tab-bar { display:flex; gap:10px; margin-bottom:18px; flex-wrap:wrap; justify-content: center;}
+.tb { background:#112233; border:1px solid #1a3a55; color:#7a9bb5; border-radius:8px; padding:8px 16px; font-size:12px; cursor:pointer; transition:all .2s; }
+.tb:hover { background:#1a3a55; color:#fff; }
+.tb.active { background:#00e5ff18; border-color:#00e5ff88; color:#00e5ff; }
+.panel { display:none; }
+.panel.active { display:block; }
+canvas { display:block; margin: 0 auto; border-radius:10px; background:#0d1b2a; max-width:100%; }
+.info-box { margin-top:12px; background:#112233; border:1px solid #1a3a55; border-radius:10px; padding:13px 15px; }
+.info-box h3 { color:#00e5ff; font-size:13px; font-weight:600; margin-bottom:5px; }
+.info-box p { color:#a8c8e0; font-size:12px; line-height:1.6; }
+.ctrl-row { display:flex; align-items:center; justify-content:center; gap:12px; margin-top:12px; flex-wrap:wrap; }
+.act-btn { border-radius:8px; padding:9px 22px; font-size:12px; cursor:pointer; transition:all .2s; font-family:inherit; font-weight:600; border:1px solid; }
+.btn-cyan { background:#00e5ff18; border-color:#00e5ff88; color:#00e5ff; }
+.btn-red  { background:#ff4a2222; border-color:#ff4a2288; color:#ff6b6b; }
+.btn-grn  { background:#00ff9918; border-color:#00ff9988; color:#00ff99; }
+.btn-org  { background:#ff880018; border-color:#ff880088; color:#ffaa44; }
+.act-btn:hover { opacity:.75; }
+.stat { background:#0d1b2a; border:1px solid #1a3a55; border-radius:7px; padding:6px 14px; text-align:center; min-width:80px; }
+.stat .sv { color:#00e5ff; font-size:16px; font-weight:700; }
+.stat .sl { color:#4a7a9b; font-size:10px; margin-top:1px; }
+</style>
+
+<div id="lg-wrap">
+  <div style="text-align:center;margin-bottom:18px;">
+    <div style="color:#fff;font-size:17px;font-weight:500;">Landing Gear & Carbon Brakes</div>
+    <div style="color:#7a9bb5;font-size:12px;margin-top:4px;">The systems that tame 400 tonnes at 180 mph</div>
+  </div>
+
+  <div class="tab-bar">
+    <button class="tb active" onclick="showTab('oleo',this)">Oleo Strut</button>
+    <button class="tb" onclick="showTab('bogie',this)">Wheels & Bogies</button>
+    <button class="tb" onclick="showTab('brake',this)">Carbon Brakes</button>
+  </div>
+
+  <!-- OLEO -->
+  <div class="panel active" id="panel-oleo">
+    <canvas id="c-oleo" width="560" height="300"></canvas>
+    <div class="ctrl-row">
+      <div class="stat"><div class="sv" id="oleo-comp">0%</div><div class="sl">Compression</div></div>
+      <div class="stat"><div class="sv" id="oleo-force">0 kN</div><div class="sl">Impact Force</div></div>
+      <button class="act-btn btn-red" id="btn-land" onclick="triggerLanding()">✈ Land!</button>
+      <button class="act-btn btn-cyan" onclick="resetOleo()">Reset</button>
+    </div>
+    <div class="info-box">
+      <h3>Oleo-pneumatic shock absorber</h3>
+      <p>The strut contains hydraulic fluid below and high-pressure nitrogen gas above. On touchdown, fluid is forced through a small orifice — the resistance absorbs the kinetic energy. Without it, the wing spar would snap on impact.</p>
+    </div>
+  </div>
+
+  <!-- BOGIE -->
+  <div class="panel" id="panel-bogie">
+    <canvas id="c-bogie" width="560" height="310"></canvas>
+    <div class="ctrl-row">
+      <button class="act-btn btn-red" id="btn-single" onclick="setBogie('single')">Single Wheel</button>
+      <button class="act-btn btn-grn active" id="btn-bogie" onclick="setBogie('bogie')">Bogie (6 wheels)</button>
+    </div>
+    <div class="info-box" id="bogie-info">
+      <h3>Bogie (6 wheels) — load distributed safely</h3>
+      <p>Six wheels spread the load across a much larger footprint. The pressure at any point on the runway stays within safe limits. The bogie beam also helps on soft or uneven surfaces by self-levelling.</p>
+    </div>
+  </div>
+
+  <!-- BRAKES -->
+  <div class="panel" id="panel-brake">
+    <canvas id="c-brake" width="560" height="300"></canvas>
+    <div class="ctrl-row">
+      <div class="stat"><div class="sv" id="brake-speed">180</div><div class="sl">Speed (mph)</div></div>
+      <div class="stat"><div class="sv" id="brake-temp">20°C</div><div class="sl">Disc Temp</div></div>
+      <button class="act-btn btn-org" id="btn-brake" onclick="applyBrakes()">Apply Brakes</button>
+      <button class="act-btn btn-cyan" onclick="resetBrake()">Reset</button>
+    </div>
+    <div class="info-box" id="brake-info">
+      <h3>Carbon-carbon composite brakes</h3>
+      <p>These discs are incredibly light yet absorb more thermal energy than any steel alternative. Under heavy braking they glow bright orange — exceeding 1,000°C — and can bring a fully laden A380 from 180 mph to a stop in under 25 seconds.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+function showTab(id, btn) {
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tb').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  btn.classList.add('active');
+}
+function lerp(a,b,t){ return a+(b-a)*t; }
+function easeInOut(t){ return t<0.5?2*t*t:1-Math.pow(-2*t+2,2)/2; }
+
+/* ══════════════════════════════════════════════════════
+   OLEO STRUT — smooth keyframe animation
+══════════════════════════════════════════════════════ */
+// Phase: 0=idle, 1=approach, 2=compress, 3=extend, 4=settle, 5=done
+let oleo = { phase:0, progress:0, comp:0, idle:0 };
+
+// Keyframe compression values per phase
+const OLEO_PHASES = [
+  { dur:60,  compStart:0,    compEnd:0 },    // 0 idle
+  { dur:40,  compStart:0,    compEnd:0.08 }, // 1 approach (slight pre-load)
+  { dur:55,  compStart:0.08, compEnd:0.82 }, // 2 heavy impact compress
+  { dur:80,  compStart:0.82, compEnd:0.28 }, // 3 extend / rebound
+  { dur:70,  compStart:0.28, compEnd:0.12 }, // 4 damp to rest
+  { dur:999, compStart:0.12, compEnd:0.12 }, // 5 settled
+];
+
+function triggerLanding() {
+  oleo = { phase:1, progress:0, comp:0.0, idle:0 };
+  document.getElementById('btn-land').disabled=true;
+}
+function resetOleo() {
+  oleo = { phase:0, progress:0, comp:0, idle:0 };
+  document.getElementById('btn-land').disabled=false;
+  document.getElementById('oleo-comp').textContent='0%';
+  document.getElementById('oleo-force').textContent='0 kN';
+}
+
+const co = document.getElementById('c-oleo').getContext('2d');
+
+function drawOleo() {
+  const W=560, H=300;
+  co.fillStyle='#0d1b2a'; co.fillRect(0,0,W,H);
+
+  // advance phase
+  const ph = OLEO_PHASES[oleo.phase];
+  oleo.progress++;
+  if(oleo.progress >= ph.dur && oleo.phase < 5) {
+    oleo.phase++;
+    oleo.progress=0;
+  }
+  const t = Math.min(1, oleo.progress / ph.dur);
+  const curPh = OLEO_PHASES[oleo.phase];
+  oleo.comp = lerp(curPh.compStart, curPh.compEnd, easeInOut(t));
+
+  const comp = oleo.comp;
+  document.getElementById('oleo-comp').textContent = Math.round(comp*100)+'%';
+  document.getElementById('oleo-force').textContent = Math.round(comp*2800)+' kN';
+
+  // layout
+  const sx = 155, strutW = 48;
+  const groundY = 258;
+  const wheelR  = 26;
+  const wheelCY = groundY - wheelR;
+
+  // max strut extent when uncompressed
+  const fullStrutH = 155;
+  // total strut shortens by up to 65px when fully compressed
+  const compOffset = comp * 65;
+  const strutTop = groundY - wheelR*2 - fullStrutH + compOffset;
+
+  // ── Ground ──
+  co.fillStyle='#1a3a22'; co.fillRect(0, groundY+3, W, H-groundY-3);
+  co.fillStyle='#2a5a32'; co.fillRect(0, groundY, W, 4);
+
+  // ── Wheel ──
+  co.fillStyle='#1a2a3a'; co.strokeStyle='#3a6a8a'; co.lineWidth=3;
+  co.beginPath(); co.arc(sx+strutW/2, wheelCY, wheelR, 0, Math.PI*2); co.fill(); co.stroke();
+  co.beginPath(); co.arc(sx+strutW/2, wheelCY, 11, 0, Math.PI*2);
+  co.fillStyle='#254a70'; co.fill(); co.stroke();
+
+  // ── Lower piston (moves up into cylinder when compressed) ──
+  const pistonBot = wheelCY - wheelR + 4;
+  const pistonH   = 75 - comp*28;
+  const pistonTop = pistonBot - pistonH;
+
+  co.fillStyle='#1e3a5a'; co.strokeStyle='#2a6a9a'; co.lineWidth=1.5;
+  co.beginPath(); co.roundRect(sx+5, pistonTop, strutW-10, pistonH, 4); co.fill(); co.stroke();
+
+  // fluid fill in lower piston (pushed upward = shrinks as fluid exits through orifice)
+  const fluidFrac = 1 - comp*0.55;
+  const fluidH = pistonH * fluidFrac;
+  co.fillStyle='#0a4a8aaa';
+  co.beginPath(); co.roundRect(sx+7, pistonTop+pistonH-fluidH, strutW-14, fluidH, [0,0,3,3]); co.fill();
+  co.fillStyle='#4a9adf'; co.font='10px Segoe UI'; co.textAlign='center';
+  co.fillText('Fluid', sx+strutW/2, pistonTop+pistonH-fluidH*0.45);
+
+  // ── Orifice plate ──
+  const orfY = pistonTop - 5;
+  co.fillStyle='#1a3a5a'; co.strokeStyle='#00e5ff66'; co.lineWidth=1;
+  co.fillRect(sx+4, orfY, strutW-8, 6);
+  co.fillStyle='#0d1b2a'; co.fillRect(sx+strutW/2-3, orfY, 6, 6); // hole
+
+  // fluid squirting through orifice when compressing
+  if(comp > 0.08 && oleo.phase===2) {
+    const alpha = Math.min(1, (comp-0.08)*4);
+    co.strokeStyle=`rgba(80,180,255,${alpha})`; co.lineWidth=2;
+    co.beginPath(); co.moveTo(sx+strutW/2, orfY-10); co.lineTo(sx+strutW/2, orfY); co.stroke();
+    co.beginPath();
+    co.moveTo(sx+strutW/2-4, orfY-6); co.lineTo(sx+strutW/2, orfY); co.lineTo(sx+strutW/2+4, orfY-6);
+    co.strokeStyle=`rgba(80,180,255,${alpha})`; co.stroke();
+  }
+
+  // ── Outer cylinder (upper) ──
+  const cylTop = strutTop;
+  const cylH   = orfY - cylTop + 6;
+  co.fillStyle='#162a40'; co.strokeStyle='#2a7aaa'; co.lineWidth=2;
+  co.beginPath(); co.roundRect(sx, cylTop, strutW, cylH, 6); co.fill(); co.stroke();
+
+  // nitrogen gas inside cylinder — changes colour with pressure
+  const gasAlpha = 0.12 + comp*0.22;
+  co.fillStyle=`rgba(0,180,80,${gasAlpha})`;
+  co.beginPath(); co.roundRect(sx+3, cylTop+4, strutW-6, cylH-10, 4); co.fill();
+  co.fillStyle='#2a9a5a'; co.font='10px Segoe UI'; co.textAlign='center';
+  co.fillText('N₂ Gas', sx+strutW/2, cylTop+cylH*0.45);
+  // pressure label
+  if(comp>0.05) {
+    const psi = Math.round(1800 + comp*1400);
+    co.fillStyle='#2a9a5a'; co.font='9px Segoe UI';
+    co.fillText(psi+' psi', sx+strutW/2, cylTop+cylH*0.62);
+  }
+
+  // ── Wing attachment bracket ──
+  co.fillStyle='#254a70'; co.strokeStyle='#2a6a9a'; co.lineWidth=1.5;
+  co.beginPath(); co.roundRect(sx-18, cylTop-20, strutW+36, 24, 5); co.fill(); co.stroke();
+  co.fillStyle='#a8c8e0'; co.font='11px Segoe UI'; co.textAlign='center';
+  co.fillText('Wing attachment', sx+strutW/2, cylTop-4);
+
+  // ── Compression arrows (shown during compress phase) ──
+  if(oleo.phase===2 && comp>0.1) {
+    const arrX = sx+strutW+28;
+    const t2 = Math.min(1, oleo.progress/OLEO_PHASES[2].dur);
+    co.strokeStyle='#ffaa44'; co.lineWidth=1.5;
+    co.beginPath(); co.moveTo(arrX, cylTop+cylH); co.lineTo(arrX, pistonTop); co.stroke();
+    co.beginPath();
+    co.moveTo(arrX-5, cylTop+cylH-7); co.lineTo(arrX, cylTop+cylH); co.lineTo(arrX+5, cylTop+cylH-7); co.stroke();
+    co.beginPath();
+    co.moveTo(arrX-5, pistonTop+7); co.lineTo(arrX, pistonTop); co.lineTo(arrX+5, pistonTop+7); co.stroke();
+    co.fillStyle='#ffaa44'; co.font='bold 12px Segoe UI'; co.textAlign='left';
+    co.fillText(Math.round(comp*100)+'%', arrX+8, (cylTop+cylH+pistonTop)/2+4);
+  }
+
+  // ── Right side labels ──
+  const lx = sx+strutW+58;
+  const lbls = [
+    [lx, cylTop+cylH*0.45, '#2a9a5a', 'Nitrogen gas'],
+    [lx, cylTop+cylH*0.6,  '#1a7a4a', '(high pressure)'],
+    [lx, orfY+3,           '#00e5ff', 'Orifice plate'],
+    [lx, pistonTop+pistonH*0.5, '#4a9adf', 'Hydraulic fluid'],
+    [lx, wheelCY,          '#a8c8e0', 'Wheel & tyre'],
+  ];
+  lbls.forEach(([x,y,c,txt]) => {
+    // leader dot
+    co.fillStyle=c; co.beginPath(); co.arc(sx+strutW+4, y, 2.5, 0, Math.PI*2); co.fill();
+    co.strokeStyle=c+'66'; co.lineWidth=0.8; co.setLineDash([3,3]);
+    co.beginPath(); co.moveTo(sx+strutW+6, y); co.lineTo(x-6, y); co.stroke();
+    co.setLineDash([]);
+    co.fillStyle=c; co.font='11px Segoe UI'; co.textAlign='left';
+    co.fillText(txt, x, y+4);
+  });
+
+  // ── Status hint ──
+  const hints=['','Approaching runway…','IMPACT — absorbing force!','Rebounding — nitrogen extends strut','Damping oscillation…','Settled — taxi to gate'];
+  co.fillStyle='#7a9bb5'; co.font='11px Segoe UI'; co.textAlign='center';
+  co.fillText(hints[oleo.phase]||'', W/2, H-8);
+
+  requestAnimationFrame(drawOleo);
+}
+drawOleo();
+
+
+/* ══════════════════════════════════════════════════════
+   BOGIE — more runway space
+══════════════════════════════════════════════════════ */
+let bogieMode = 'bogie';
+let bogieT = 0;
+
+function setBogie(m) {
+  bogieMode = m;
+  document.getElementById('btn-single').className = m==='single'?'act-btn btn-red':'act-btn btn-cyan';
+  document.getElementById('btn-bogie').className  = m==='bogie' ?'act-btn btn-grn':'act-btn btn-cyan';
+  const i = document.getElementById('bogie-info');
+  if(m==='single') {
+    i.querySelector('h3').textContent='Single wheel — runway damage';
+    i.querySelector('p').textContent='All 400+ tonnes concentrated on one small contact patch. The pressure per square centimetre is extreme — enough to crack asphalt or punch through wet ground. This is why no modern airliner uses single wheels on main gear.';
+  } else {
+    i.querySelector('h3').textContent='Bogie (6 wheels) — load distributed safely';
+    i.querySelector('p').textContent='Six wheels spread the load across a much larger footprint. The pressure at any point on the runway stays within safe limits. The bogie beam also helps on soft or uneven surfaces by self-levelling.';
+  }
+}
+
+const cb = document.getElementById('c-bogie').getContext('2d');
+function drawBogie() {
+  const W=560,H=310;
+  bogieT+=0.03;
+  cb.fillStyle='#0d1b2a'; cb.fillRect(0,0,W,H);
+
+  const groundY = 175; // moved up — gives more runway space below
+  const runwayH = H - groundY; // ~135px for labels
+
+  // runway body
+  cb.fillStyle='#14301a'; cb.fillRect(0, groundY+6, W, runwayH-6);
+  // asphalt surface
+  cb.fillStyle='#1e4026'; cb.fillRect(0, groundY, W, 6);
+  // runway centre line
+  cb.strokeStyle='#ffffff18'; cb.lineWidth=2; cb.setLineDash([24,18]);
+  cb.beginPath(); cb.moveTo(0, groundY+50); cb.lineTo(W, groundY+50); cb.stroke();
+  cb.setLineDash([]);
+
+  const cx = W/2;
+
+  if(bogieMode==='single') {
+    const wr=55;
+    // strut
+    cb.fillStyle='#1e3a5a'; cb.strokeStyle='#2a6a9a'; cb.lineWidth=1.5;
+    cb.beginPath(); cb.roundRect(cx-10, groundY-wr*2-50, 20, wr*2+12, 4); cb.fill(); cb.stroke();
+    // wheel
+    cb.fillStyle='#1a2a3a'; cb.strokeStyle='#3a6a8a'; cb.lineWidth=3;
+    cb.beginPath(); cb.arc(cx, groundY-wr, wr, 0, Math.PI*2); cb.fill(); cb.stroke();
+    cb.beginPath(); cb.arc(cx, groundY-wr, 22, 0, Math.PI*2);
+    cb.fillStyle='#254a70'; cb.fill(); cb.stroke();
+    // contact patch
+    cb.fillStyle='#ff2a2a44'; cb.strokeStyle='#ff6b6b'; cb.lineWidth=1.5;
+    cb.beginPath(); cb.ellipse(cx, groundY+3, 32, 7, 0, 0, Math.PI*2); cb.fill(); cb.stroke();
+    // pressure arrows
+    cb.strokeStyle='#ff6b6b'; cb.lineWidth=2;
+    for(let i=-2;i<=2;i++){
+      const ax=cx+i*13, aLen=28-Math.abs(i)*4;
+      cb.beginPath(); cb.moveTo(ax, groundY+8); cb.lineTo(ax, groundY+8+aLen); cb.stroke();
+      cb.beginPath(); cb.moveTo(ax-4,groundY+8+aLen-6); cb.lineTo(ax,groundY+8+aLen); cb.lineTo(ax+4,groundY+8+aLen-6); cb.stroke();
+    }
+    // crack animation
+    const crackA = 0.5+Math.sin(bogieT*2)*0.3;
+    cb.strokeStyle=`rgba(255,80,80,${crackA})`; cb.lineWidth=1.5;
+    cb.beginPath(); cb.moveTo(cx+12,groundY+10); cb.lineTo(cx+42,groundY+26); cb.lineTo(cx+34,groundY+40); cb.stroke();
+    cb.beginPath(); cb.moveTo(cx-10,groundY+10); cb.lineTo(cx-38,groundY+24); cb.lineTo(cx-28,groundY+40); cb.stroke();
+    // labels
+    cb.fillStyle='#ff6b6b'; cb.font='bold 12px Segoe UI'; cb.textAlign='center';
+    cb.fillText('Contact patch: ~600 cm²', cx, groundY+68);
+    cb.fillStyle='#cc4444'; cb.font='11px Segoe UI';
+    cb.fillText('Surface pressure: ~420 kPa', cx, groundY+86);
+    cb.fillStyle='#ff3333'; cb.font='bold 11px Segoe UI';
+    cb.fillText('⚠ RUNWAY DAMAGE', cx, groundY+106);
+
+  } else {
+    // bogie
+    const wheels = [-70, 0, 70];
+    const beamY = groundY - 55;
+    // strut
+    cb.fillStyle='#1e3a5a'; cb.strokeStyle='#2a6a9a'; cb.lineWidth=1.5;
+    cb.beginPath(); cb.roundRect(cx-10, beamY-85, 20, 90, 4); cb.fill(); cb.stroke();
+    // bogie beam
+    cb.fillStyle='#254a70'; cb.strokeStyle='#2a7aaa'; cb.lineWidth=1.5;
+    cb.beginPath(); cb.roundRect(cx-98, beamY-8, 196, 16, 5); cb.fill(); cb.stroke();
+    // wheels
+    wheels.forEach(wx => {
+      cb.fillStyle='#1a2a3a'; cb.strokeStyle='#3a6a8a'; cb.lineWidth=2;
+      cb.beginPath(); cb.arc(cx+wx, groundY-22, 24, 0, Math.PI*2); cb.fill(); cb.stroke();
+      cb.beginPath(); cb.arc(cx+wx, groundY-22, 9, 0, Math.PI*2);
+      cb.fillStyle='#254a70'; cb.fill(); cb.stroke();
+      // contact patch per wheel (green)
+      cb.fillStyle='#00aa4433'; cb.strokeStyle='#00ff9988'; cb.lineWidth=1;
+      cb.beginPath(); cb.ellipse(cx+wx, groundY+3, 16, 5, 0, 0, Math.PI*2); cb.fill(); cb.stroke();
+    });
+    // combined footprint bracket
+    cb.strokeStyle='#00ff9966'; cb.lineWidth=1; cb.setLineDash([4,3]);
+    cb.beginPath(); cb.roundRect(cx-108, groundY, 216, 10, 3); cb.stroke();
+    cb.setLineDash([]);
+    // gentle pressure arrows
+    cb.strokeStyle='#00ff99'; cb.lineWidth=1.5;
+    wheels.forEach(wx => {
+      cb.beginPath(); cb.moveTo(cx+wx, groundY+10); cb.lineTo(cx+wx, groundY+24); cb.stroke();
+      cb.beginPath(); cb.moveTo(cx+wx-4,groundY+18); cb.lineTo(cx+wx,groundY+24); cb.lineTo(cx+wx+4,groundY+18); cb.stroke();
+    });
+    // labels
+    cb.fillStyle='#00ff99'; cb.font='bold 12px Segoe UI'; cb.textAlign='center';
+    cb.fillText('Contact patch: ~3,200 cm²', cx, groundY+54);
+    cb.fillStyle='#00cc77'; cb.font='11px Segoe UI';
+    cb.fillText('Surface pressure: ~80 kPa', cx, groundY+72);
+    cb.fillStyle='#00ff99'; cb.font='bold 11px Segoe UI';
+    cb.fillText('✓ RUNWAY SAFE', cx, groundY+92);
+  }
+
+  cb.fillStyle='#7a9bb5'; cb.font='11px Segoe UI'; cb.textAlign='center';
+  cb.fillText('Toggle between layouts to compare load distribution', cx, 20);
+
+  requestAnimationFrame(drawBogie);
+}
+drawBogie();
+
+
+/* ══════════════════════════════════════════════════════
+   BRAKES
+══════════════════════════════════════════════════════ */
+let brakeState = { speed:180, temp:20, braking:false, angle:0 };
+
+function applyBrakes() {
+  if(brakeState.speed<=0) return;
+  brakeState.braking=true;
+  document.getElementById('btn-brake').disabled=true;
+}
+function resetBrake() {
+  brakeState = { speed:180, temp:20, braking:false, angle:0 };
+  document.getElementById('btn-brake').disabled=false;
+  document.getElementById('brake-temp').style.color='#00e5ff';
+  document.getElementById('brake-info').querySelector('h3').textContent='Carbon-carbon composite brakes';
+  document.getElementById('brake-info').querySelector('p').textContent='These discs are incredibly light yet absorb more thermal energy than any steel alternative. Under heavy braking they glow bright orange — exceeding 1,000°C — and can bring a fully laden A380 from 180 mph to a stop in under 25 seconds.';
+}
+
+const cbr = document.getElementById('c-brake').getContext('2d');
+function drawBrake() {
+  const W=560,H=300,cx=W/2,cy=H/2-10;
+  cbr.fillStyle='#0d1b2a'; cbr.fillRect(0,0,W,H);
+
+  const s = brakeState;
+  if(s.braking && s.speed>0) {
+    s.speed = Math.max(0, s.speed-1.4);
+    s.temp  = Math.min(1050, s.temp+(1050-s.temp)*0.015);
+    if(s.speed<=0){
+      s.braking=false;
+      document.getElementById('brake-info').querySelector('h3').textContent='Stopped — disc temp exceeds 1,000°C';
+      document.getElementById('brake-info').querySelector('p').textContent='The carbon-carbon discs are glowing orange-red. All the kinetic energy of a fully laden aircraft at 180 mph has been converted to heat — which these remarkable composite discs then slowly radiate away.';
+    }
+  }
+  if(!s.braking && s.temp>20) s.temp=Math.max(20,s.temp-1.2);
+  s.angle += s.speed*0.002;
+
+  document.getElementById('brake-speed').textContent=Math.round(s.speed);
+  document.getElementById('brake-temp').textContent=Math.round(s.temp)+'°C';
+
+  const tf=(s.temp-20)/1030;
+
+  // glow halo behind wheel
+  if(tf>0.05){
+    const gr=cbr.createRadialGradient(cx,cy,8,cx,cy,80+tf*50);
+    gr.addColorStop(0,`rgba(255,120,0,${tf*0.75})`);
+    gr.addColorStop(0.55,`rgba(255,50,0,${tf*0.35})`);
+    gr.addColorStop(1,'rgba(255,0,0,0)');
+    cbr.fillStyle=gr; cbr.beginPath(); cbr.arc(cx,cy,80+tf*50,0,Math.PI*2); cbr.fill();
+  }
+
+  // tyre
+  cbr.save(); cbr.translate(cx,cy); cbr.rotate(s.angle);
+  cbr.fillStyle='#1a2030'; cbr.strokeStyle='#3a5a7a'; cbr.lineWidth=2.5;
+  cbr.beginPath(); cbr.arc(0,0,72,0,Math.PI*2); cbr.fill(); cbr.stroke();
+  for(let i=0;i<12;i++){
+    const a=i/12*Math.PI*2;
+    cbr.save(); cbr.rotate(a);
+    cbr.fillStyle='#252535'; cbr.fillRect(-5,57,10,16); cbr.restore();
+  }
+  cbr.restore();
+
+  // brake disc — colour shifts cool→grey→orange→red-orange
+  const discCol = tf<0.25
+    ? `rgb(${lerp(40,100,tf*4)},${lerp(55,70,tf*4)},${lerp(80,60,tf*4)})`
+    : tf<0.55
+      ? `rgb(${lerp(100,220,((tf-.25)/.3))},${lerp(70,100,(tf-.25)/.3)},40)`
+      : `rgb(255,${lerp(100,165,((tf-.55)/.45))},0)`;
+
+  cbr.save(); cbr.translate(cx,cy); cbr.rotate(s.angle*0.75);
+  cbr.strokeStyle=discCol; cbr.lineWidth=11;
+  cbr.beginPath(); cbr.arc(0,0,50,0,Math.PI*2); cbr.stroke();
+  // vane slots
+  for(let i=0;i<8;i++){
+    const a=i/8*Math.PI*2;
+    cbr.save(); cbr.rotate(a);
+    cbr.strokeStyle=discCol; cbr.lineWidth=3;
+    cbr.beginPath(); cbr.moveTo(30,0); cbr.lineTo(48,0); cbr.stroke();
+    cbr.restore();
+  }
+  cbr.restore();
+
+  // heat shimmer wavy lines above wheel when very hot
+  if(tf>0.45){
+    const t2=s.angle;
+    cbr.strokeStyle=`rgba(255,140,0,${tf*0.45})`; cbr.lineWidth=1.2; cbr.setLineDash([2,3]);
+    for(let i=0;i<5;i++){
+      const ox=(i-2)*18;
+      cbr.beginPath();
+      cbr.moveTo(cx+ox, cy-74);
+      cbr.bezierCurveTo(cx+ox+Math.sin(t2+i)*6,cy-94, cx+ox+Math.sin(t2+i+1)*5,cy-104, cx+ox+Math.sin(t2+i)*4,cy-118);
+      cbr.stroke();
+    }
+    cbr.setLineDash([]);
+  }
+
+  // hub
+  cbr.fillStyle='#254a70'; cbr.strokeStyle='#2a6a9a'; cbr.lineWidth=2;
+  cbr.beginPath(); cbr.arc(cx,cy,18,0,Math.PI*2); cbr.fill(); cbr.stroke();
+
+  // calliper
+  cbr.fillStyle='#1e3a5a'; cbr.strokeStyle= tf>0.1?`rgba(255,${lerp(100,165,tf)},0,${0.5+tf*0.5})`:'#2a6a9a'; cbr.lineWidth=1.5;
+  cbr.beginPath(); cbr.roundRect(cx+46,cy-18,22,36,5); cbr.fill(); cbr.stroke();
+  if(tf>0.05){
+    cbr.fillStyle=`rgba(255,${lerp(80,165,tf)},0,${tf*0.6})`;
+    cbr.beginPath(); cbr.roundRect(cx+50,cy-14,6,28,2); cbr.fill();
+  }
+
+  // temp colour
+  const tc = tf<0.3?'#a8c8e0':tf<0.6?'#ffaa44':'#ff6b44';
+  document.getElementById('brake-temp').style.color=tc;
+
+  cbr.fillStyle='#7a9bb5'; cbr.font='11px Segoe UI'; cbr.textAlign='center';
+  cbr.fillText(s.speed>0?'Wheel spinning — press "Apply Brakes" to stop':'Fully stopped', cx, H-10);
+
+  requestAnimationFrame(drawBrake);
+}
+drawBrake();
+</script>
