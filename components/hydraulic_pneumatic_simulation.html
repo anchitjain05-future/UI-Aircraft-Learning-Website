@@ -1,0 +1,470 @@
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  .sim{background:#08131e;padding:1.5rem;font-family:'DM Sans',sans-serif;color:#e0f0f4}
+  .sim-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:600;letter-spacing:.12em;color:#3a6a7a;text-transform:uppercase;margin-bottom:1rem}
+
+  .canvas-wrap{position:relative;width:100%;height:270px;margin-bottom:1rem;border-radius:10px;overflow:hidden;background:#050f18}
+  #mc{width:100%;height:100%;display:block}
+
+  .readouts{display:grid;grid-template-columns:repeat(5,1fr);gap:.6rem;margin-bottom:1rem}
+  .rd{background:#0d1e2d;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:.6rem .8rem}
+  .rd-name{font-size:10px;letter-spacing:.07em;color:#3a6a7a;text-transform:uppercase;margin-bottom:2px}
+  .rd-val{font-family:'DM Mono',monospace;font-size:17px;font-weight:500}
+  .c-hyd{color:#4a9eff}
+  .c-pneu{color:#c080ff}
+  .c-gear{color:#00e0bc}
+  .c-rudder{color:#f0a830}
+  .c-psi{color:#ff8060}
+  .rd-unit{font-size:10px;color:#3a6a7a;margin-left:2px}
+
+  .controls{display:flex;gap:.6rem;margin-bottom:1rem}
+  .ctrl{flex:1;background:#0d1e2d;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:.55rem .4rem;font-size:11px;color:#7abccc;cursor:pointer;text-align:center;transition:all .15s;font-family:'DM Sans',sans-serif}
+  .ctrl:hover{border-color:rgba(255,255,255,0.2);color:#c0e8f0}
+  .ctrl.active{background:rgba(74,158,255,0.08);border-color:#4a9eff;color:#4a9eff}
+  .ctrl.pneu{border-color:rgba(192,128,255,0.2);color:#a070e0}
+  .ctrl.pneu.active{background:rgba(192,128,255,0.1);border-color:#c080ff;color:#c080ff}
+  .ctrl.danger{border-color:rgba(255,60,40,0.25);color:#ff8060}
+  .ctrl.danger.active{background:rgba(255,60,40,0.1);border-color:#ff4030;color:#ff5030}
+
+  .log{background:#040d14;border:1px solid rgba(255,255,255,0.05);border-radius:8px;padding:.7rem 1rem;height:62px;overflow:hidden}
+  .log-line{font-family:'DM Mono',monospace;font-size:11px;color:#3a6a7a;line-height:1.7}
+  .log-line.hyd{color:#4a9eff}
+  .log-line.pneu{color:#c080ff}
+  .log-line.warn{color:#ffc040}
+  .log-line.alert{color:#ff5030}
+</style>
+
+<div class="sim">
+  <div class="sim-title">Hydraulic &amp; Pneumatic Systems — Live Simulation</div>
+  <div class="canvas-wrap"><canvas id="mc"></canvas></div>
+
+  <div class="readouts">
+    <div class="rd"><div class="rd-name">Hyd Pressure</div><div><span class="rd-val c-hyd" id="rd-hp">3,000</span><span class="rd-unit">psi</span></div></div>
+    <div class="rd"><div class="rd-name">Pneu Pressure</div><div><span class="rd-val c-pneu" id="rd-pp">180</span><span class="rd-unit">psi</span></div></div>
+    <div class="rd"><div class="rd-name">Gear Position</div><div><span class="rd-val c-gear" id="rd-gear">UP</span></div></div>
+    <div class="rd"><div class="rd-name">Rudder Load</div><div><span class="rd-val c-rudder" id="rd-rud">0</span><span class="rd-unit">% deflect</span></div></div>
+    <div class="rd"><div class="rd-name">Brake Force</div><div><span class="rd-val c-psi" id="rd-brk">0</span><span class="rd-unit">psi</span></div></div>
+  </div>
+
+  <div class="controls">
+    <div class="ctrl active" id="btn-cruise"   onclick="setMode('cruise')">✦ Cruise</div>
+    <div class="ctrl"        id="btn-gear"     onclick="setMode('gear')">⬇ Land gear</div>
+    <div class="ctrl"        id="btn-rudder"   onclick="setMode('rudder')">↔ Full rudder</div>
+    <div class="ctrl pneu"   id="btn-startup"  onclick="setMode('startup')">⚡ Engine start</div>
+    <div class="ctrl danger" id="btn-hydloss"  onclick="setMode('hydloss')">⚠ Hyd failure</div>
+  </div>
+
+  <div class="log">
+    <div class="log-line hyd" id="ll0">[ 00:00 ] Hydraulic system A+B nominal. Pressure 3,000 psi.</div>
+    <div class="log-line"     id="ll1">[ 00:01 ] Pneumatic system charged. Bleed air 180 psi.</div>
+    <div class="log-line"     id="ll2">[ 00:02 ] Flight controls active. Landing gear retracted.</div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('mc');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() {
+  const r = canvas.parentElement.getBoundingClientRect();
+  W = canvas.width = r.width; H = canvas.height = r.height;
+}
+resize(); window.addEventListener('resize', resize);
+
+let tick = 0, mode = 'cruise', autoLogTick = 0;
+
+const MODES = {
+  cruise:  { hp:3000, pp:180, gearPct:0,   rudder:0,  brk:0,   label:'Cruise. Both hydraulic systems nominal at 3,000 psi.', cls:'hyd' },
+  gear:    { hp:2800, pp:180, gearPct:100, rudder:0,  brk:2800,label:'Gear down — hydraulic actuators extending. Brake pressure charged.', cls:'hyd' },
+  rudder:  { hp:2950, pp:180, gearPct:0,   rudder:100,brk:0,   label:'Full rudder deflection — hydraulic pistons holding 2,950 psi against airload.', cls:'hyd' },
+  startup: { hp:800,  pp:220, gearPct:0,   rudder:0,  brk:0,   label:'Engine start — pneumatics spinning turbine at 220 psi. Hydraulics building.', cls:'pneu' },
+  hydloss: { hp:80,   pp:180, gearPct:0,   rudder:40, brk:0,   label:'ALERT: Hydraulic system A failure — backup system B active. Controls degraded.', cls:'alert' },
+};
+
+let cur = { hp:3000, pp:180, gearPct:0, rudder:0, brk:0 };
+let tgt = { ...MODES.cruise };
+
+function setMode(m) {
+  mode = m;
+  tgt = { ...MODES[m] };
+  document.querySelectorAll('.ctrl').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-'+m).classList.add('active');
+  addLog(MODES[m].label, MODES[m].cls);
+}
+function lerp(a,b,t){return a+(b-a)*t;}
+
+// ── Particles ─────────────────────────────────────────────
+let hydP = [], pneuP = [];
+
+function spawnHyd() {
+  if (cur.hp < 200) return;
+  const intensity = cur.hp / 3000;
+  if (Math.random() > intensity * 0.5) return;
+  // Route: pump (center-bottom) → actuator destinations
+  const dests = [
+    {tx: W*0.15, ty: H*0.55}, // left gear
+    {tx: W*0.85, ty: H*0.55}, // right gear
+    {tx: W*0.5,  ty: H*0.2},  // rudder
+    {tx: W*0.28, ty: H*0.35}, // left aileron
+    {tx: W*0.72, ty: H*0.35}, // right aileron
+  ];
+  const d = dests[Math.floor(Math.random()*dests.length)];
+  hydP.push({
+    x: W*0.5, y: H*0.78,
+    tx: d.tx + (Math.random()-0.5)*20,
+    ty: d.ty + (Math.random()-0.5)*15,
+    t: 0, speed: 0.012 + Math.random()*0.01,
+    size: 2.5,
+  });
+}
+
+function spawnPneu() {
+  if (mode !== 'startup' && Math.random() > 0.15) return;
+  if (mode === 'startup' && Math.random() > 0.6) return;
+  // Route: bleed (engine positions) → starter / AC packs
+  const dests = [
+    {tx: W*0.35, ty: H*0.65}, // engine starter L
+    {tx: W*0.65, ty: H*0.65}, // engine starter R
+    {tx: W*0.5,  ty: H*0.4},  // AC pack center
+  ];
+  const d = dests[Math.floor(Math.random()*dests.length)];
+  const sx = Math.random() > 0.5 ? W*0.3 : W*0.7;
+  pneuP.push({
+    x: sx, y: H*0.5,
+    tx: d.tx, ty: d.ty,
+    t: 0, speed: 0.018 + Math.random()*0.015,
+    size: 2,
+  });
+}
+
+function updateCurrent() {
+  const s = 0.028;
+  cur.hp      = lerp(cur.hp,      tgt.hp,      s);
+  cur.pp      = lerp(cur.pp,      tgt.pp,      s);
+  cur.gearPct = lerp(cur.gearPct, tgt.gearPct, s*0.4);
+  cur.rudder  = lerp(cur.rudder,  tgt.rudder,  s);
+  cur.brk     = lerp(cur.brk,     tgt.brk,     s);
+
+  document.getElementById('rd-hp').textContent   = Math.round(cur.hp).toLocaleString();
+  document.getElementById('rd-pp').textContent   = Math.round(cur.pp);
+  const gp = Math.round(cur.gearPct);
+  document.getElementById('rd-gear').textContent  = gp < 5 ? 'UP' : gp > 95 ? 'DOWN' : gp+'%';
+  document.getElementById('rd-rud').textContent   = Math.round(cur.rudder);
+  document.getElementById('rd-brk').textContent   = Math.round(cur.brk).toLocaleString();
+}
+
+// ── Drawing ───────────────────────────────────────────────
+function drawBg() {
+  ctx.fillStyle = '#050f18';
+  ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(0,60,100,0.08)';ctx.lineWidth=.5;
+  for(let x=0;x<W;x+=36){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=36){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+}
+
+function drawAircraft() {
+  ctx.save();
+  // Fuselage
+  ctx.fillStyle='#0c1e30'; ctx.strokeStyle='#1a3a52'; ctx.lineWidth=1.2;
+  ctx.beginPath();
+  ctx.ellipse(W*0.5, H*0.42, W*0.28, H*0.14, 0, 0, Math.PI*2);
+  ctx.fill(); ctx.stroke();
+
+  // Tail / vertical stabilizer
+  ctx.beginPath();
+  ctx.moveTo(W*0.22, H*0.42);
+  ctx.lineTo(W*0.12, H*0.18);
+  ctx.lineTo(W*0.18, H*0.18);
+  ctx.lineTo(W*0.26, H*0.42);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // Wings
+  ctx.beginPath();
+  ctx.moveTo(W*0.38, H*0.44);
+  ctx.lineTo(W*0.06, H*0.34);
+  ctx.lineTo(W*0.07, H*0.38);
+  ctx.lineTo(W*0.4,  H*0.5);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(W*0.62, H*0.44);
+  ctx.lineTo(W*0.94, H*0.34);
+  ctx.lineTo(W*0.93, H*0.38);
+  ctx.lineTo(W*0.6,  H*0.5);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // Horizontal stabilizer
+  ctx.beginPath();
+  ctx.moveTo(W*0.27, H*0.42);
+  ctx.lineTo(W*0.14, H*0.38);
+  ctx.lineTo(W*0.15, H*0.41);
+  ctx.lineTo(W*0.29, H*0.45);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(W*0.35, H*0.42);
+  ctx.lineTo(W*0.22, H*0.38);
+  ctx.lineTo(W*0.23, H*0.41);
+  ctx.lineTo(W*0.37, H*0.45);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawHydLines() {
+  const alpha = Math.min(1, cur.hp/3000) * 0.18;
+  ctx.save();
+  ctx.strokeStyle = `rgba(74,158,255,${alpha})`;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4,7]);
+  const dests = [
+    [W*0.15,H*0.55],[W*0.85,H*0.55],[W*0.5,H*0.2],[W*0.28,H*0.35],[W*0.72,H*0.35]
+  ];
+  dests.forEach(([tx,ty]) => {
+    ctx.beginPath(); ctx.moveTo(W*0.5,H*0.78); ctx.lineTo(tx,ty); ctx.stroke();
+  });
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+function drawPneuLines() {
+  const alpha = (cur.pp/220) * 0.14;
+  ctx.save();
+  ctx.strokeStyle = `rgba(192,128,255,${alpha})`;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([3,8]);
+  [[W*0.3,H*0.5],[W*0.7,H*0.5]].forEach(([sx,sy]) => {
+    [[W*0.35,H*0.65],[W*0.65,H*0.65],[W*0.5,H*0.4]].forEach(([tx,ty]) => {
+      ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(tx,ty); ctx.stroke();
+    });
+  });
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+function drawHydPump() {
+  const x = W*0.5, y = H*0.78;
+  const ok = cur.hp > 500;
+  const pulse = Math.abs(Math.sin(tick*0.06));
+  ctx.beginPath();
+  ctx.arc(x, y, 14, 0, Math.PI*2);
+  ctx.fillStyle = ok ? `rgba(74,158,255,${0.15+pulse*0.1})` : 'rgba(255,60,40,0.15)';
+  ctx.fill();
+  ctx.strokeStyle = ok ? `rgba(74,158,255,${0.5+pulse*0.3})` : `rgba(255,60,40,${0.5+pulse*0.4})`;
+  ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.font='8px DM Mono,monospace'; ctx.textAlign='center';
+  ctx.fillStyle = ok ? 'rgba(74,158,255,0.6)' : 'rgba(255,80,60,0.8)';
+  ctx.fillText('HYD PUMP', x, y+24);
+  ctx.textAlign='left';
+}
+
+function drawPneuNodes() {
+  [[W*0.3,H*0.5,'ENG L'],[W*0.7,H*0.5,'ENG R']].forEach(([x,y,lbl]) => {
+    const pulse = Math.abs(Math.sin(tick*0.05 + x));
+    ctx.beginPath();
+    ctx.arc(x, y, 11, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(192,128,255,${0.12+pulse*0.08})`;
+    ctx.fill();
+    ctx.strokeStyle = `rgba(192,128,255,${0.4+pulse*0.25})`;
+    ctx.lineWidth=1.2; ctx.stroke();
+    ctx.font='8px DM Mono,monospace'; ctx.textAlign='center';
+    ctx.fillStyle='rgba(192,128,255,0.5)';
+    ctx.fillText(lbl, x, y+22);
+    ctx.textAlign='left';
+  });
+}
+
+function drawGear() {
+  const gp = cur.gearPct / 100;
+  [[W*0.15,H*0.52],[W*0.85,H*0.52],[W*0.5,H*0.56]].forEach(([bx,by],i) => {
+    const legLen = 22 * gp;
+    const wheelY = by + legLen;
+    // strut
+    ctx.strokeStyle = `rgba(0,224,188,${0.3+gp*0.5})`;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(bx,by); ctx.lineTo(bx,wheelY); ctx.stroke();
+    // wheel
+    if (gp > 0.05) {
+      ctx.beginPath();
+      ctx.arc(bx, wheelY+5, 5+gp*2, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(0,224,188,${gp*0.6})`;
+      ctx.fill();
+      ctx.strokeStyle = `rgba(0,224,188,${gp*0.8})`;
+      ctx.lineWidth = 1; ctx.stroke();
+    }
+  });
+}
+
+function drawRudder() {
+  const deflect = (cur.rudder/100) * 18;
+  const bx = W*0.14, by = H*0.18;
+  ctx.save();
+  ctx.translate(bx, by+14);
+  ctx.rotate((deflect * Math.PI/180));
+  ctx.fillStyle = `rgba(240,168,48,${0.15+cur.rudder/100*0.5})`;
+  ctx.strokeStyle = `rgba(240,168,48,${0.4+cur.rudder/100*0.4})`;
+  ctx.lineWidth=1.5;
+  ctx.beginPath();
+  ctx.moveTo(-3,-14); ctx.lineTo(3,-14); ctx.lineTo(5,0); ctx.lineTo(-5,0); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.restore();
+  if (cur.rudder > 5) {
+    ctx.font='8px DM Mono,monospace'; ctx.textAlign='center';
+    ctx.fillStyle='rgba(240,168,48,0.55)';
+    ctx.fillText('RUDDER', W*0.14, H*0.14);
+    ctx.textAlign='left';
+  }
+}
+
+function drawAilerons() {
+  // Left aileron deflect hint
+  const ail = (cur.rudder/100)*12;
+  [[W*0.16,H*0.36,1],[W*0.84,H*0.36,-1]].forEach(([x,y,dir]) => {
+    ctx.save();
+    ctx.translate(x,y);
+    ctx.rotate(dir*ail*Math.PI/180);
+    ctx.fillStyle=`rgba(240,168,48,${0.1+cur.rudder/100*0.2})`;
+    ctx.strokeStyle=`rgba(240,168,48,${0.3+cur.rudder/100*0.3})`;
+    ctx.lineWidth=1;
+    ctx.beginPath(); ctx.rect(-12,-3,24,6); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  });
+}
+
+function drawHydParticles() {
+  hydP.forEach(p => {
+    const prog = p.t;
+    const px = p.x + (p.tx-p.x)*prog;
+    const py = p.y + (p.ty-p.y)*prog;
+    const a = prog<0.15?prog/0.15:prog>0.8?(1-prog)/0.2:1;
+    ctx.beginPath();
+    ctx.arc(px,py,p.size,0,Math.PI*2);
+    ctx.fillStyle=`rgba(74,158,255,${a*0.85})`;
+    ctx.fill();
+    p.t += p.speed;
+  });
+  hydP = hydP.filter(p=>p.t<1);
+}
+
+function drawPneuParticles() {
+  pneuP.forEach(p => {
+    const prog = p.t;
+    const px = p.x + (p.tx-p.x)*prog;
+    const py = p.y + (p.ty-p.y)*prog;
+    const a = prog<0.15?prog/0.15:prog>0.8?(1-prog)/0.2:1;
+    ctx.beginPath();
+    ctx.arc(px,py,p.size,0,Math.PI*2);
+    ctx.fillStyle=`rgba(192,128,255,${a*0.75})`;
+    ctx.fill();
+    p.t += p.speed;
+  });
+  pneuP = pneuP.filter(p=>p.t<1);
+}
+
+function drawLabels() {
+  ctx.font='9px DM Mono,monospace';
+  // Hyd pressure label
+  const hydOk = cur.hp > 500;
+  ctx.fillStyle = hydOk ? 'rgba(74,158,255,0.45)' : `rgba(255,60,40,${0.5+Math.abs(Math.sin(tick*.08))*.4})`;
+  ctx.fillText(hydOk ? `HYD  ${Math.round(cur.hp).toLocaleString()} psi` : '⚠ HYD FAIL', W*0.52, H*0.78+5);
+  // Pneu label
+  ctx.fillStyle='rgba(192,128,255,0.4)';
+  ctx.fillText(`PNEU  ${Math.round(cur.pp)} psi`, W*0.52, H*0.78+17);
+  // System type legends
+  ctx.fillStyle='rgba(74,158,255,0.3)';
+  ctx.fillText('── HYDRAULIC (liquid)', W*0.04, H*0.95);
+  ctx.fillStyle='rgba(192,128,255,0.3)';
+  ctx.fillText('── PNEUMATIC (gas)', W*0.4, H*0.95);
+}
+
+function drawHydFailure() {
+  if (mode !== 'hydloss') return;
+  const pulse = Math.abs(Math.sin(tick*.07));
+  ctx.beginPath();
+  ctx.arc(W*.5, H*.78, 20+pulse*6, 0, Math.PI*2);
+  ctx.strokeStyle=`rgba(255,60,40,${pulse*.7})`;
+  ctx.lineWidth=2; ctx.stroke();
+}
+
+function drawStartupTurbine() {
+  if (mode !== 'startup') return;
+  [[W*.35,H*.65],[W*.65,H*.65]].forEach(([ex,ey]) => {
+    ctx.save();
+    ctx.translate(ex,ey);
+    ctx.rotate(tick*.12);
+    for(let i=0;i<6;i++){
+      const a=(i/6)*Math.PI*2;
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.arc(0,0,12,a,a+Math.PI/7);
+      ctx.closePath();
+      ctx.fillStyle='rgba(192,128,255,0.35)';
+      ctx.fill();
+    }
+    ctx.restore();
+    ctx.beginPath();
+    ctx.arc(ex,ey,4,0,Math.PI*2);
+    ctx.fillStyle='rgba(192,128,255,0.7)';
+    ctx.fill();
+    ctx.font='7px DM Mono,monospace'; ctx.textAlign='center';
+    ctx.fillStyle='rgba(192,128,255,0.55)';
+    ctx.fillText('STARTER', ex, ey+22);
+    ctx.textAlign='left';
+  });
+}
+
+let logTimer=0;
+function addLog(msg,cls){
+  const m=String(Math.floor(tick/60)).padStart(2,'0');
+  const s=String(tick%60).padStart(2,'0');
+  const lines=document.querySelectorAll('.log-line');
+  lines[0].textContent=lines[1].textContent; lines[0].className='log-line';
+  lines[1].textContent=lines[2].textContent; lines[1].className='log-line';
+  lines[2].textContent=`[ ${m}:${s} ] ${msg}`; lines[2].className=`log-line ${cls}`;
+}
+function autoLog(){
+  logTimer++;
+  if(logTimer%140!==0)return;
+  const msgs={
+    cruise:[['Hydraulic systems A+B pressurized. Flight controls nominal.','hyd'],['Pneumatic system charged via engine bleed. Packs running.','pneu']],
+    gear:[['Gear doors open — hydraulic actuators extending at 2,800 psi.','hyd'],['Anti-skid brakes armed. Hydraulic brake pressure 2,800 psi.','hyd']],
+    rudder:[['Rudder PCU holding deflection against 500 MPH airloads.','hyd'],['Aileron hydraulic servo at full travel. Pilot effort: near zero.','hyd']],
+    startup:[['Pneumatic starter spinning turbine — bleed air 220 psi.','pneu'],['Engine light-off detected. Starter cutting out.','pneu']],
+    hydloss:[['ALERT: System A pressure loss. Switching to System B.','alert'],['WARN: Some flight controls on single hydraulic source.','warn']],
+  };
+  const arr=msgs[mode]||msgs.cruise;
+  const[msg,cls]=arr[Math.floor(Math.random()*arr.length)];
+  addLog(msg,cls);
+}
+
+function loop(){
+  tick++;
+  updateCurrent();
+  drawBg();
+  drawHydLines();
+  drawPneuLines();
+  drawHydParticles();
+  drawPneuParticles();
+  drawAircraft();
+  drawGear();
+  drawRudder();
+  drawAilerons();
+  drawHydPump();
+  drawPneuNodes();
+  drawStartupTurbine();
+  drawHydFailure();
+  drawLabels();
+  spawnHyd();
+  spawnPneu();
+  autoLog();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>

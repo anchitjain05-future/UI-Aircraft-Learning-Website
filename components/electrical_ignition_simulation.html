@@ -1,0 +1,406 @@
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  .sim{background:#08131e;padding:1.5rem;font-family:'DM Sans',sans-serif;color:#e0f0f4}
+  .sim-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:600;letter-spacing:.12em;color:#3a6a7a;text-transform:uppercase;margin-bottom:1rem}
+  .canvas-wrap{position:relative;width:100%;height:270px;margin-bottom:1rem;border-radius:10px;overflow:hidden;background:#050f18}
+  #mc{width:100%;height:100%;display:block}
+  .readouts{display:grid;grid-template-columns:repeat(5,1fr);gap:.6rem;margin-bottom:1rem}
+  .rd{background:#0d1e2d;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:.6rem .8rem}
+  .rd-name{font-size:10px;letter-spacing:.07em;color:#3a6a7a;text-transform:uppercase;margin-bottom:2px}
+  .rd-val{font-family:'DM Mono',monospace;font-size:17px;font-weight:500}
+  .c-v{color:#ffe060}  .c-hz{color:#60d0ff}  .c-bat{color:#60ff90}
+  .c-ign{color:#ff8040} .c-bus{color:#c080ff}
+  .rd-unit{font-size:10px;color:#3a6a7a;margin-left:2px}
+  .controls{display:flex;gap:.6rem;margin-bottom:1rem}
+  .ctrl{flex:1;background:#0d1e2d;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:.55rem .4rem;font-size:11px;color:#7abccc;cursor:pointer;text-align:center;transition:all .15s;font-family:'DM Sans',sans-serif}
+  .ctrl:hover{border-color:rgba(255,255,255,0.2);color:#c0e8f0}
+  .ctrl.active{background:rgba(255,224,96,0.08);border-color:#ffe060;color:#ffe060}
+  .ctrl.ign{border-color:rgba(255,128,64,0.25);color:#ff9050}
+  .ctrl.ign.active{background:rgba(255,128,64,0.1);border-color:#ff8040;color:#ff8040}
+  .ctrl.danger{border-color:rgba(255,60,40,0.25);color:#ff8060}
+  .ctrl.danger.active{background:rgba(255,60,40,0.1);border-color:#ff4030;color:#ff5030}
+  .log{background:#040d14;border:1px solid rgba(255,255,255,0.05);border-radius:8px;padding:.7rem 1rem;height:62px;overflow:hidden}
+  .log-line{font-family:'DM Mono',monospace;font-size:11px;color:#3a6a7a;line-height:1.7}
+  .log-line.elec{color:#ffe060} .log-line.ign{color:#ff8040}
+  .log-line.bat{color:#60ff90}  .log-line.warn{color:#ffc040}
+  .log-line.alert{color:#ff5030}
+</style>
+
+<div class="sim">
+  <div class="sim-title">Electrical &amp; Ignition Systems — Live Simulation</div>
+  <div class="canvas-wrap"><canvas id="mc"></canvas></div>
+  <div class="readouts">
+    <div class="rd"><div class="rd-name">Bus Voltage</div><div><span class="rd-val c-v" id="rd-v">115</span><span class="rd-unit">VAC</span></div></div>
+    <div class="rd"><div class="rd-name">Frequency</div><div><span class="rd-val c-hz" id="rd-hz">400</span><span class="rd-unit">Hz</span></div></div>
+    <div class="rd"><div class="rd-name">Battery</div><div><span class="rd-val c-bat" id="rd-bat">100</span><span class="rd-unit">%</span></div></div>
+    <div class="rd"><div class="rd-name">Igniter</div><div><span class="rd-val c-ign" id="rd-ign">OFF</span></div></div>
+    <div class="rd"><div class="rd-name">Gen Load</div><div><span class="rd-val c-bus" id="rd-load">62</span><span class="rd-unit">%</span></div></div>
+  </div>
+  <div class="controls">
+    <div class="ctrl active" id="btn-cruise"    onclick="setMode('cruise')">✦ Cruise</div>
+    <div class="ctrl ign"    id="btn-start"     onclick="setMode('start')">⚡ Engine start</div>
+    <div class="ctrl ign"    id="btn-turbulence" onclick="setMode('turbulence')">⛈ Turbulence</div>
+    <div class="ctrl danger" id="btn-genloss"   onclick="setMode('genloss')">⚠ Gen failure</div>
+    <div class="ctrl danger" id="btn-blackout"  onclick="setMode('blackout')">⚠ Total blackout</div>
+  </div>
+  <div class="log">
+    <div class="log-line elec" id="ll0">[ 00:00 ] IDG generators online. 115 VAC / 400 Hz nominal.</div>
+    <div class="log-line"      id="ll1">[ 00:01 ] AC bus A+B powered. Battery float charge active.</div>
+    <div class="log-line"      id="ll2">[ 00:02 ] Ignition exciters standby. Avionics bus load 62%.</div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('mc');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize(){ const r=canvas.parentElement.getBoundingClientRect(); W=canvas.width=r.width; H=canvas.height=r.height; }
+resize(); window.addEventListener('resize',resize);
+
+let tick=0, mode='cruise', logTimer=0;
+
+const MODES = {
+  cruise:     { v:115, hz:400, bat:100, ign:false, load:62,  genA:true,  genB:true,  label:'Both IDG generators online. 115 VAC / 400 Hz stable.', cls:'elec' },
+  start:      { v:108, hz:390, bat:85,  ign:true,  load:88,  genA:true,  genB:true,  label:'Engine start — ignition exciters firing. High-voltage spark active.', cls:'ign' },
+  turbulence: { v:115, hz:400, bat:100, ign:true,  load:65,  genA:true,  genB:true,  label:'Turbulence detected — ignition exciters ON to prevent flame blowout.', cls:'ign' },
+  genloss:    { v:112, hz:398, bat:95,  ign:false, load:99,  genA:false, genB:true,  label:'ALERT: Generator A failed — single generator carrying full load.', cls:'warn' },
+  blackout:   { v:28,  hz:0,   bat:72,  ign:false, load:0,   genA:false, genB:false, label:'EMERGENCY: Both generators offline — DC battery backup only!', cls:'alert' },
+};
+
+let cur = { v:115, hz:400, bat:100, load:62, batDrain:0 };
+let tgt = { ...MODES.cruise };
+
+function setMode(m){
+  mode=m; tgt={...MODES[m]};
+  document.querySelectorAll('.ctrl').forEach(b=>b.classList.remove('active'));
+  document.getElementById('btn-'+m).classList.add('active');
+  addLog(MODES[m].label, MODES[m].cls);
+}
+function lerp(a,b,t){return a+(b-a)*t;}
+
+// ── Particles ─────────────────────────────────────────────
+let elecP=[], ignP=[], batP=[];
+
+// Nodes layout
+function genPos(side){ return side==='A' ? {x:W*0.22,y:H*0.65} : {x:W*0.78,y:H*0.65}; }
+function busPos(side){ return side==='A' ? {x:W*0.38,y:H*0.35} : {x:W*0.62,y:H*0.35}; }
+const BAT_POS = ()=>({x:W*0.5,y:H*0.68});
+const AVIONICS = ()=>({x:W*0.5,y:H*0.18});
+const IGNITER_L = ()=>({x:W*0.28,y:H*0.52});
+const IGNITER_R = ()=>({x:W*0.72,y:H*0.52});
+
+function spawnElec(){
+  if(mode==='blackout') return;
+  ['A','B'].forEach(side=>{
+    if(mode==='genloss' && side==='A') return;
+    if(Math.random()>0.45) return;
+    const g=genPos(side), b=busPos(side);
+    elecP.push({x:g.x,y:g.y,tx:b.x+(Math.random()-.5)*30,ty:b.ty||(b.y+(Math.random()-.5)*20),t:0,speed:.018+Math.random()*.012,side});
+    // gen → avionics
+    if(Math.random()>.5){
+      const av=AVIONICS();
+      elecP.push({x:b.x,y:b.y,tx:av.x+(Math.random()-.5)*40,ty:av.y+(Math.random()-.5)*20,t:0,speed:.014+Math.random()*.01,side});
+    }
+  });
+}
+
+function spawnBat(){
+  if(mode!=='blackout') return;
+  if(Math.random()>.5) return;
+  const bat=BAT_POS(), av=AVIONICS();
+  batP.push({x:bat.x+(Math.random()-.5)*20,y:bat.y,tx:av.x+(Math.random()-.5)*50,ty:av.y+(Math.random()-.5)*20,t:0,speed:.012+Math.random()*.008});
+}
+
+function spawnIgn(){
+  if(!tgt.ign) return;
+  if(Math.random()>.55) return;
+  [IGNITER_L(),IGNITER_R()].forEach(ig=>{
+    const b = mode==='start'||mode==='turbulence';
+    if(!b) return;
+    ignP.push({x:ig.x,y:ig.y,angle:Math.random()*Math.PI*2,speed:2+Math.random()*2.5,life:0,maxLife:20+Math.random()*15});
+  });
+}
+
+function updateCurrent(){
+  const s=.025;
+  cur.v    = lerp(cur.v,    tgt.v,    s);
+  cur.hz   = lerp(cur.hz,   tgt.hz,   s);
+  cur.load = lerp(cur.load, tgt.load, s);
+  if(mode==='blackout') cur.bat = Math.max(0, cur.bat - 0.015);
+  else cur.bat = lerp(cur.bat, tgt.bat, s*.3);
+
+  document.getElementById('rd-v').textContent    = Math.round(cur.v);
+  document.getElementById('rd-hz').textContent   = Math.round(cur.hz);
+  document.getElementById('rd-bat').textContent  = Math.round(cur.bat);
+  document.getElementById('rd-ign').textContent  = tgt.ign ? 'ACTIVE' : 'OFF';
+  document.getElementById('rd-load').textContent = Math.round(cur.load);
+
+  const ignEl = document.getElementById('rd-ign');
+  ignEl.style.color = tgt.ign ? '#ff8040' : '#3a6a7a';
+}
+
+// ── Drawing ───────────────────────────────────────────────
+function drawBg(){
+  ctx.fillStyle='#050f18'; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle='rgba(0,60,100,0.07)'; ctx.lineWidth=.5;
+  for(let x=0;x<W;x+=36){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=36){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+}
+
+function drawBusLines(){
+  const alpha = mode==='blackout' ? .04 : .12;
+  ctx.save(); ctx.setLineDash([4,7]); ctx.lineWidth=1.2;
+  ['A','B'].forEach(side=>{
+    const ok = !(mode==='genloss'&&side==='A') && mode!=='blackout';
+    ctx.strokeStyle = ok ? `rgba(255,224,96,${alpha})` : 'rgba(255,60,40,0.06)';
+    const g=genPos(side),b=busPos(side),av=AVIONICS();
+    ctx.beginPath(); ctx.moveTo(g.x,g.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(b.x,b.y); ctx.lineTo(av.x,av.y); ctx.stroke();
+  });
+  // Battery → avionics
+  const bv=BAT_POS(),av=AVIONICS();
+  ctx.strokeStyle = mode==='blackout' ? 'rgba(96,255,144,0.18)' : 'rgba(96,255,144,0.06)';
+  ctx.beginPath(); ctx.moveTo(bv.x,bv.y); ctx.lineTo(av.x,av.y); ctx.stroke();
+  // Igniter lines
+  if(tgt.ign){
+    ctx.strokeStyle='rgba(255,128,64,0.15)';
+    [IGNITER_L(),IGNITER_R()].forEach(ig=>{
+      ctx.beginPath(); ctx.moveTo(bv.x,bv.y); ctx.lineTo(ig.x,ig.y); ctx.stroke();
+    });
+  }
+  ctx.setLineDash([]); ctx.restore();
+}
+
+function drawGenerator(side){
+  const {x,y}=genPos(side);
+  const ok = !(mode==='genloss'&&side==='A') && mode!=='blackout';
+  const rpm = ok ? 1 : 0;
+  const pulse=Math.abs(Math.sin(tick*.07+x));
+
+  // Rotor spin
+  ctx.save(); ctx.translate(x,y); ctx.rotate(tick*.08*rpm);
+  for(let i=0;i<6;i++){
+    const a=(i/6)*Math.PI*2;
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.arc(0,0,16,a,a+.35);
+    ctx.closePath();
+    ctx.fillStyle=ok?`rgba(255,224,96,${.15+rpm*.25})`:'rgba(255,60,40,0.1)';
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Outer ring
+  ctx.beginPath(); ctx.arc(x,y,20,0,Math.PI*2);
+  ctx.strokeStyle=ok?`rgba(255,224,96,${.3+pulse*.25})`:`rgba(255,60,40,${.4+pulse*.4})`;
+  ctx.lineWidth=1.5; ctx.stroke();
+  ctx.beginPath(); ctx.arc(x,y,7,0,Math.PI*2);
+  ctx.fillStyle=ok?`rgba(255,224,96,${.3+rpm*.4})`:'rgba(255,60,40,0.3)';
+  ctx.fill();
+
+  ctx.font='8px DM Mono,monospace'; ctx.textAlign='center';
+  ctx.fillStyle=ok?'rgba(255,224,96,0.55)':'rgba(255,60,40,0.6)';
+  ctx.fillText(`IDG ${side}`, x, y+30);
+  ctx.fillText(ok?'ONLINE':'FAILED', x, y+40);
+  ctx.textAlign='left';
+}
+
+function drawBus(side){
+  const {x,y}=busPos(side);
+  const ok = !(mode==='genloss'&&side==='A') && mode!=='blackout';
+  ctx.beginPath(); ctx.roundRect(x-22,y-12,44,24,5);
+  ctx.fillStyle=ok?'rgba(255,224,96,0.07)':'rgba(60,60,60,0.1)';
+  ctx.fill();
+  ctx.strokeStyle=ok?'rgba(255,224,96,0.3)':'rgba(100,100,100,0.2)';
+  ctx.lineWidth=1; ctx.stroke();
+  ctx.font='8px DM Mono,monospace'; ctx.textAlign='center';
+  ctx.fillStyle=ok?'rgba(255,224,96,0.55)':'rgba(100,100,100,0.35)';
+  ctx.fillText(`AC BUS ${side}`, x, y+4);
+  ctx.textAlign='left';
+}
+
+function drawBattery(){
+  const {x,y}=BAT_POS();
+  const active=mode==='blackout';
+  const pct=cur.bat/100;
+  const pulse=Math.abs(Math.sin(tick*.09));
+
+  // Battery body
+  ctx.beginPath(); ctx.roundRect(x-18,y-12,36,24,4);
+  ctx.fillStyle=active?'rgba(96,255,144,0.12)':'rgba(96,255,144,0.05)';
+  ctx.fill();
+  ctx.strokeStyle=active?`rgba(96,255,144,${.5+pulse*.35})`:'rgba(96,255,144,0.25)';
+  ctx.lineWidth=1.5; ctx.stroke();
+
+  // Fill bar
+  ctx.fillStyle=`rgba(96,255,144,${active?0.5:0.2})`;
+  ctx.fillRect(x-15,y-8,Math.round(30*pct),16);
+
+  ctx.font='8px DM Mono,monospace'; ctx.textAlign='center';
+  ctx.fillStyle=active?'rgba(96,255,144,0.8)':'rgba(96,255,144,0.45)';
+  ctx.fillText('BATT', x, y-16);
+  ctx.fillText(Math.round(cur.bat)+'%', x, y+26);
+  ctx.textAlign='left';
+}
+
+function drawAvionics(){
+  const {x,y}=AVIONICS();
+  const powered = mode!=='blackout' || cur.bat>5;
+  const flicker = mode==='blackout' ? (Math.random()>.3?1:0) : 1;
+
+  ctx.beginPath(); ctx.roundRect(x-48,y-14,96,28,6);
+  ctx.fillStyle=powered?`rgba(96,184,255,${.06*flicker})`:'rgba(20,20,30,0.5)';
+  ctx.fill();
+  ctx.strokeStyle=powered?`rgba(96,184,255,${.35*flicker})`:'rgba(50,50,80,0.3)';
+  ctx.lineWidth=1.2; ctx.stroke();
+
+  ctx.font='9px DM Mono,monospace'; ctx.textAlign='center';
+  ctx.fillStyle=powered?`rgba(96,184,255,${.7*flicker})`:'rgba(80,80,120,0.4)';
+  ctx.fillText(powered?'AVIONICS  /  FLY-BY-WIRE':'  NO POWER  ', x, y+4);
+  ctx.textAlign='left';
+
+  // Flickering indicator lights
+  if(powered){
+    for(let i=0;i<6;i++){
+      ctx.beginPath();
+      ctx.arc(x-38+i*14, y-18, 2.5, 0, Math.PI*2);
+      const on = Math.random()>.15;
+      ctx.fillStyle=on?['#ffe060','#60d0ff','#60ff90','#c080ff','#ff8040','#ffe060'][i]:'rgba(30,50,70,0.5)';
+      ctx.fill();
+    }
+  }
+}
+
+function drawIgniters(){
+  [IGNITER_L(),IGNITER_R()].forEach((ig,i)=>{
+    const active=tgt.ign;
+    const spark=active && Math.sin(tick*.25+(i*1.7))>0.4;
+    ctx.beginPath(); ctx.arc(ig.x,ig.y,10,0,Math.PI*2);
+    ctx.fillStyle=active?'rgba(255,128,64,0.15)':'rgba(40,60,80,0.3)';
+    ctx.fill();
+    ctx.strokeStyle=active?`rgba(255,128,64,${spark?.9:.3})`:'rgba(60,90,110,0.3)';
+    ctx.lineWidth=1.5; ctx.stroke();
+
+    if(spark){
+      // Lightning bolt
+      ctx.save(); ctx.translate(ig.x,ig.y);
+      ctx.strokeStyle='rgba(255,200,80,0.9)'; ctx.lineWidth=1.5;
+      ctx.beginPath();
+      ctx.moveTo(2,-7); ctx.lineTo(-1,-1); ctx.lineTo(2,0); ctx.lineTo(-2,7);
+      ctx.stroke();
+      // spark scatter
+      for(let j=0;j<4;j++){
+        const a=Math.random()*Math.PI*2, d=5+Math.random()*6;
+        ctx.beginPath(); ctx.moveTo(0,0);
+        ctx.lineTo(Math.cos(a)*d, Math.sin(a)*d);
+        ctx.strokeStyle=`rgba(255,200,80,${.3+Math.random()*.5})`; ctx.lineWidth=.8; ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    ctx.font='8px DM Mono,monospace'; ctx.textAlign='center';
+    ctx.fillStyle=active?'rgba(255,128,64,0.55)':'rgba(60,100,120,0.4)';
+    ctx.fillText(`IGN ${i===0?'L':'R'}`, ig.x, ig.y+20);
+    ctx.fillText(active?'FIRING':'STBY', ig.x, ig.y+29);
+    ctx.textAlign='left';
+  });
+}
+
+function drawElecParticles(){
+  elecP.forEach(p=>{
+    const prog=p.t;
+    const px=p.x+(p.tx-p.x)*prog, py=p.y+(p.ty-p.y)*prog;
+    const a=prog<.15?prog/.15:prog>.8?(1-prog)/.2:1;
+    ctx.beginPath(); ctx.arc(px,py,2.2,0,Math.PI*2);
+    ctx.fillStyle=`rgba(255,224,96,${a*.9})`; ctx.fill();
+    p.t+=p.speed;
+  });
+  elecP=elecP.filter(p=>p.t<1);
+}
+
+function drawBatParticles(){
+  batP.forEach(p=>{
+    const prog=p.t;
+    const px=p.x+(p.tx-p.x)*prog, py=p.y+(p.ty-p.y)*prog;
+    const a=prog<.15?prog/.15:prog>.8?(1-prog)/.2:1;
+    ctx.beginPath(); ctx.arc(px,py,2,0,Math.PI*2);
+    ctx.fillStyle=`rgba(96,255,144,${a*.85})`; ctx.fill();
+    p.t+=p.speed;
+  });
+  batP=batP.filter(p=>p.t<1);
+}
+
+function drawIgnParticles(){
+  ignP.forEach(p=>{
+    const prog=p.life/p.maxLife;
+    const px=ignP[0]? IGNITER_L().x : IGNITER_R().x; // handled below
+    p.cx = p.cx || (p.side==='L'?IGNITER_L().x:IGNITER_R().x);
+    p.cy = p.cy || (p.side==='L'?IGNITER_L().y:IGNITER_R().y);
+    const ex=p.cx+Math.cos(p.angle)*p.speed*p.life;
+    const ey=p.cy+Math.sin(p.angle)*p.speed*p.life;
+    ctx.beginPath(); ctx.arc(ex,ey,1.8*(1-prog),0,Math.PI*2);
+    ctx.fillStyle=`rgba(255,200,80,${(1-prog)*.8})`; ctx.fill();
+    p.life++;
+  });
+  ignP=ignP.filter(p=>p.life<p.maxLife);
+}
+
+function spawnIgnFixed(){
+  if(!tgt.ign || Math.random()>.4) return;
+  [['L',IGNITER_L()],['R',IGNITER_R()]].forEach(([s,ig])=>{
+    if(Math.random()>.5) return;
+    ignP.push({cx:ig.x,cy:ig.y,side:s,angle:Math.random()*Math.PI*2,speed:1.5+Math.random()*2,life:0,maxLife:18+Math.random()*12});
+  });
+}
+
+function drawBlackoutOverlay(){
+  if(mode!=='blackout') return;
+  const alpha=.35*(1-cur.bat/100)*Math.abs(Math.sin(tick*.04));
+  ctx.fillStyle=`rgba(0,0,0,${alpha})`;
+  ctx.fillRect(0,0,W,H);
+}
+
+let logT=0;
+function addLog(msg,cls){
+  const m=String(Math.floor(tick/60)).padStart(2,'0');
+  const s=String(tick%60).padStart(2,'0');
+  const lines=document.querySelectorAll('.log-line');
+  lines[0].textContent=lines[1].textContent; lines[0].className='log-line';
+  lines[1].textContent=lines[2].textContent; lines[1].className='log-line';
+  lines[2].textContent=`[ ${m}:${s} ] ${msg}`; lines[2].className=`log-line ${cls}`;
+}
+function autoLog(){
+  logT++;
+  if(logT%140!==0) return;
+  const msgs={
+    cruise: [['IDG A+B generating 115 VAC / 400 Hz. Load 62%.','elec'],['AC bus A+B fully powered. Battery on float charge.','elec']],
+    start:  [['Ignition exciters firing — high-voltage continuous spark.','ign'],['Engine light-off. Ignition remains on until stable idle.','ign']],
+    turbulence:[['Exciters activated — preventing combustion blowout in turbulence.','ign'],['Ignition ON per crew discretion. Flame continuously re-lit.','ign']],
+    genloss:[['WARN: IDG A offline. IDG B carrying 99% load.','warn'],['Advisory: APU generator available for backup.','warn']],
+    blackout:[['EMERGENCY: All generators offline — DC battery only!','alert'],['Avionics on battery backup. Non-essential loads shed.','alert']],
+  };
+  const arr=msgs[mode]||msgs.cruise;
+  const[msg,cls]=arr[Math.floor(Math.random()*arr.length)];
+  addLog(msg,cls);
+}
+
+function loop(){
+  tick++;
+  updateCurrent();
+  drawBg();
+  drawBusLines();
+  drawElecParticles();
+  drawBatParticles();
+  drawGenerator('A'); drawGenerator('B');
+  drawBus('A'); drawBus('B');
+  drawBattery();
+  drawAvionics();
+  drawIgniters();
+  drawIgnParticles();
+  drawBlackoutOverlay();
+  spawnElec(); spawnBat(); spawnIgnFixed();
+  autoLog();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>

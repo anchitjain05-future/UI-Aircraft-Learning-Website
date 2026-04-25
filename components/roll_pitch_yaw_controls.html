@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<div id="wrap">
+  <div id="title-bar">
+    <h2>Flight Control Axes</h2>
+    <p>Select a control to see how the aircraft moves</p>
+  </div>
+
+  <div id="tabs">
+    <button class="tab active" onclick="selectAxis(0)">
+      <span class="tab-icon">⟳</span> Roll
+    </button>
+    <button class="tab" onclick="selectAxis(1)">
+      <span class="tab-icon">⤢</span> Pitch
+    </button>
+    <button class="tab" onclick="selectAxis(2)">
+      <span class="tab-icon">↻</span> Yaw
+    </button>
+  </div>
+
+  <div id="stage">
+    <canvas id="c" width="560" height="260"></canvas>
+    <div id="axis-label"></div>
+  </div>
+
+  <div id="info-box">
+    <div id="info-left">
+      <div class="info-chip" id="chip-surface"></div>
+      <div class="info-chip" id="chip-axis"></div>
+    </div>
+    <div id="info-desc"></div>
+  </div>
+</div>
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: transparent; }
+#wrap {
+  background: #0d1b2a;
+  border-radius: 16px;
+  padding: 24px 20px 20px;
+  font-family: 'Segoe UI', sans-serif;
+  min-height: 480px;
+}
+#title-bar { text-align: center; margin-bottom: 18px; }
+#title-bar h2 { color: #fff; font-size: 17px; font-weight: 500; letter-spacing: 0.02em; }
+#title-bar p { color: #7a9bb5; font-size: 12px; margin-top: 4px; }
+
+#tabs {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.tab {
+  background: #112233;
+  border: 1px solid #1a3a55;
+  color: #7a9bb5;
+  border-radius: 8px;
+  padding: 8px 22px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex; align-items: center; gap: 6px;
+}
+.tab:hover { background: #1a3a55; color: #fff; }
+.tab.active { background: #00e5ff18; border-color: #00e5ff88; color: #00e5ff; }
+.tab-icon { font-size: 15px; }
+
+#stage {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+#c { display: block; max-width: 100%; }
+
+#axis-label {
+  position: absolute;
+  top: 10px; right: 10px;
+  background: #00e5ff15;
+  border: 1px solid #00e5ff44;
+  border-radius: 8px;
+  padding: 6px 14px;
+  color: #00e5ff;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+#info-box {
+  margin-top: 14px;
+  background: #112233;
+  border: 1px solid #1a3a55;
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+#info-left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 110px;
+}
+.info-chip {
+  background: #0d1b2a;
+  border: 1px solid #1a3a55;
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 10px;
+  color: #00e5ff;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.chip-label { color: #4a7a9b; font-weight: 400; display: block; font-size: 9px; margin-bottom: 2px; }
+#info-desc { color: #a8c8e0; font-size: 12px; line-height: 1.6; }
+</style>
+
+<script>
+const axes = [
+  {
+    name: 'Roll',
+    axisLabel: 'Longitudinal Axis',
+    surface: 'Ailerons',
+    axisText: 'Roll (Longitudinal)',
+    action: 'Rotate control yoke left / right',
+    desc: 'Ailerons on the outer trailing edges of each wing move in opposite directions. One goes up, the other goes down — changing lift asymmetrically and tipping (rolling) the aircraft around its nose-to-tail axis.',
+    color: '#ff6b6b',
+    animate: drawRoll
+  },
+  {
+    name: 'Pitch',
+    axisLabel: 'Lateral Axis',
+    surface: 'Elevators',
+    axisText: 'Pitch (Lateral)',
+    action: 'Push / pull control yoke fore-aft',
+    desc: 'Elevators on the horizontal stabilizer at the tail rotate the aircraft nose-up or nose-down around its wing-to-wing axis. Pulling back raises the nose; pushing forward lowers it.',
+    color: '#00e5ff',
+    animate: drawPitch
+  },
+  {
+    name: 'Yaw',
+    axisLabel: 'Vertical Axis',
+    surface: 'Rudder',
+    axisText: 'Yaw (Vertical)',
+    action: 'Press left / right rudder pedals',
+    desc: 'The rudder on the vertical stabilizer swings the nose left or right around a vertical axis running through the centre of the aircraft. Used to coordinate turns and counteract adverse yaw.',
+    color: '#00ff99',
+    animate: drawYaw
+  }
+];
+
+let current = 0;
+let animFrame = null;
+let t = 0;
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+function selectAxis(idx) {
+  current = idx;
+  document.querySelectorAll('.tab').forEach((b, i) => b.classList.toggle('active', i === idx));
+  const a = axes[idx];
+  document.getElementById('axis-label').textContent = a.axisLabel;
+  document.getElementById('chip-surface').innerHTML = `<span class="chip-label">Control Surface</span>${a.surface}`;
+  document.getElementById('chip-axis').innerHTML = `<span class="chip-label">Pilot Action</span><span style="color:#a8c8e0;text-transform:none;font-weight:400;letter-spacing:0;font-size:10px">${a.action}</span>`;
+  document.getElementById('info-desc').textContent = a.desc;
+  t = 0;
+  if (animFrame) cancelAnimationFrame(animFrame);
+  loop();
+}
+
+function loop() {
+  t += 0.018;
+  axes[current].animate(t);
+  animFrame = requestAnimationFrame(loop);
+}
+
+// ─── shared helpers ───────────────────────────────────────────────────────────
+const W = 560, H = 260;
+const cx = W / 2, cy = H / 2;
+
+function clear() {
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0d1b2a';
+  ctx.fillRect(0, 0, W, H);
+}
+
+function drawAxisLine(x1,y1,x2,y2,color) {
+  ctx.save();
+  ctx.setLineDash([5,4]);
+  ctx.strokeStyle = color + '55';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  ctx.restore();
+}
+
+// ─── ROLL ─────────────────────────────────────────────────────────────────────
+function drawRoll(t) {
+  clear();
+  const angle = Math.sin(t) * 0.45; // rock ±~25°
+  const color = axes[0].color;
+
+  // axis line (nose to tail)
+  drawAxisLine(cx-20, cy, cx+20, cy, color);
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
+
+  // fuselage (tube)
+  ctx.fillStyle = '#1e3a5a'; ctx.strokeStyle = '#2a5a8a'; ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 90, 16, 0, 0, Math.PI*2);
+  ctx.fill(); ctx.stroke();
+
+  // nose cone
+  ctx.fillStyle = '#254a70';
+  ctx.beginPath();
+  ctx.moveTo(90, -8); ctx.bezierCurveTo(115, -6, 118, 6, 90, 8); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // main wings
+  ctx.fillStyle = '#163050'; ctx.strokeStyle = '#2a5a8a'; ctx.lineWidth = 1.2;
+  // right wing
+  ctx.beginPath();
+  ctx.moveTo(-10,-14); ctx.lineTo(10,-14); ctx.lineTo(10,-80); ctx.lineTo(-15,-78); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  // left wing
+  ctx.beginPath();
+  ctx.moveTo(-10,14); ctx.lineTo(10,14); ctx.lineTo(10,80); ctx.lineTo(-15,78); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // ailerons highlight
+  const aOff = Math.sin(t) * 18;
+  ctx.fillStyle = color + 'bb'; ctx.strokeStyle = color; ctx.lineWidth = 1;
+  // right aileron up
+  ctx.beginPath();
+  ctx.moveTo(5,-60); ctx.lineTo(10,-60-aOff); ctx.lineTo(10,-78-aOff/2); ctx.lineTo(5,-78); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  // left aileron down
+  ctx.beginPath();
+  ctx.moveTo(5,60); ctx.lineTo(10,60+aOff); ctx.lineTo(10,78+aOff/2); ctx.lineTo(5,78); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // engines
+  ctx.fillStyle = '#1a3555'; ctx.strokeStyle = '#2a5a8a'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.ellipse(-5, -42, 14, 5, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(-5, 42, 14, 5, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+
+  ctx.restore();
+
+  // arc arrows
+  const r = 105;
+  ctx.save(); ctx.translate(cx, cy);
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.arc(0, 0, r, -Math.PI/2 - 0.6, -Math.PI/2 + 0.6);
+  ctx.stroke();
+  arrowHead(ctx, r, -Math.PI/2 + 0.6, color, 1);
+  ctx.beginPath();
+  ctx.arc(0, 0, r, Math.PI/2 - 0.6, Math.PI/2 + 0.6);
+  ctx.stroke();
+  arrowHead(ctx, r, Math.PI/2 + 0.6, color, -1);
+  ctx.restore();
+
+  // label
+  labelText('ROLL', cx, cy + r + 22, color);
+}
+
+// ─── PITCH ────────────────────────────────────────────────────────────────────
+function drawPitch(t) {
+  clear();
+  const angle = Math.sin(t) * 0.35;
+  const color = axes[1].color;
+
+  drawAxisLine(cx - 160, cy, cx + 160, cy, color);
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
+
+  // fuselage
+  ctx.fillStyle = '#1e3a5a'; ctx.strokeStyle = '#2a5a8a'; ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 110, 18, 0, 0, Math.PI*2);
+  ctx.fill(); ctx.stroke();
+
+  // nose
+  ctx.fillStyle = '#254a70';
+  ctx.beginPath();
+  ctx.moveTo(110,-10); ctx.bezierCurveTo(135,-8,138,8,110,10); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // wings (side view — thin)
+  ctx.fillStyle = '#163050'; ctx.strokeStyle = '#2a5a8a'; ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-20,-18); ctx.lineTo(15,-18); ctx.lineTo(25,-55); ctx.lineTo(-20,-52); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // tail horizontal stab
+  ctx.beginPath();
+  ctx.moveTo(-110,-18); ctx.lineTo(-85,-18); ctx.lineTo(-78,-40); ctx.lineTo(-110,-38); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // elevator highlight
+  const eOff = Math.sin(t) * 10;
+  ctx.fillStyle = color + 'bb'; ctx.strokeStyle = color; ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-104,-28); ctx.lineTo(-88,-28); ctx.lineTo(-84,-38-eOff); ctx.lineTo(-100,-37-eOff); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // vertical stab
+  ctx.fillStyle = '#163050'; ctx.strokeStyle = '#2a5a8a'; ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-110,-18); ctx.lineTo(-100,-18); ctx.lineTo(-95,-50); ctx.lineTo(-112,-48); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // engine
+  ctx.fillStyle = '#1a3555'; ctx.strokeStyle = '#2a5a8a'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.ellipse(-10, -36, 16, 5, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+
+  ctx.restore();
+
+  // arc arrow (around lateral axis)
+  const r = 80;
+  ctx.save(); ctx.translate(cx, cy);
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.arc(0, 0, r, Math.PI - 0.6, Math.PI + 0.6);
+  ctx.stroke();
+  arrowHead2(ctx, r, Math.PI + 0.6, color);
+  ctx.restore();
+
+  labelText('PITCH', cx, cy + 115, color);
+}
+
+// ─── YAW ──────────────────────────────────────────────────────────────────────
+function drawYaw(t) {
+  clear();
+  const angle = Math.sin(t) * 0.35;
+  const color = axes[2].color;
+
+  // top-down view
+  drawAxisLine(cx, cy-20, cx, cy+20, color);
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
+
+  // fuselage top-down
+  ctx.fillStyle = '#1e3a5a'; ctx.strokeStyle = '#2a5a8a'; ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 100, 20, 0, 0, Math.PI*2);
+  ctx.fill(); ctx.stroke();
+
+  // nose
+  ctx.fillStyle = '#254a70';
+  ctx.beginPath();
+  ctx.moveTo(100,-10); ctx.bezierCurveTo(125,-6,128,6,100,10); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // wings top
+  ctx.fillStyle = '#163050'; ctx.strokeStyle = '#2a5a8a'; ctx.lineWidth = 1.2;
+  // right
+  ctx.beginPath();
+  ctx.moveTo(-15,-20); ctx.lineTo(20,-20); ctx.lineTo(20,-90); ctx.lineTo(-20,-88); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  // left
+  ctx.beginPath();
+  ctx.moveTo(-15,20); ctx.lineTo(20,20); ctx.lineTo(20,90); ctx.lineTo(-20,88); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // horizontal stabilizers
+  ctx.beginPath();
+  ctx.moveTo(-100,-20); ctx.lineTo(-75,-20); ctx.lineTo(-68,-50); ctx.lineTo(-100,-48); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(-100,20); ctx.lineTo(-75,20); ctx.lineTo(-68,50); ctx.lineTo(-100,48); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // vertical stabilizer (rudder) top-down = narrow fin
+  ctx.beginPath();
+  ctx.moveTo(-102,-4); ctx.lineTo(-102,4); ctx.lineTo(-78,3); ctx.lineTo(-78,-3); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // rudder highlight
+  const rOff = Math.sin(t) * 12;
+  ctx.fillStyle = color + 'bb'; ctx.strokeStyle = color; ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-102,-4+rOff/3); ctx.lineTo(-102,4+rOff/3);
+  ctx.lineTo(-82,3+rOff); ctx.lineTo(-82,-3+rOff); ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // engines
+  ctx.fillStyle = '#1a3555'; ctx.strokeStyle = '#2a5a8a'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.ellipse(-5, -55, 5, 14, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.ellipse(-5, 55, 5, 14, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+
+  ctx.restore();
+
+  // arc arrows top-down
+  const r = 118;
+  ctx.save(); ctx.translate(cx, cy);
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.arc(0, 0, r, Math.PI/2 - 0.6, Math.PI/2 + 0.6);
+  ctx.stroke();
+  arrowHead(ctx, r, Math.PI/2 + 0.6, color, 1);
+  ctx.beginPath();
+  ctx.arc(0, 0, r, -Math.PI/2 - 0.6, -Math.PI/2 + 0.6);
+  ctx.stroke();
+  arrowHead(ctx, r, -Math.PI/2 + 0.6, color, -1);
+  ctx.restore();
+
+  labelText('YAW', cx + r + 28, cy, color);
+}
+
+// ─── helpers ──────────────────────────────────────────────────────────────────
+function arrowHead(ctx, r, endAngle, color, dir) {
+  const x = Math.cos(endAngle) * r;
+  const y = Math.sin(endAngle) * r;
+  const tangentAngle = endAngle + Math.PI/2 * dir;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(tangentAngle);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(0, 0); ctx.lineTo(-5, 9); ctx.lineTo(5, 9);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+function arrowHead2(ctx, r, endAngle, color) {
+  const x = Math.cos(endAngle) * r;
+  const y = Math.sin(endAngle) * r;
+  const tangentAngle = endAngle + Math.PI/2;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(tangentAngle);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(0,0); ctx.lineTo(-5,9); ctx.lineTo(5,9);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+}
+
+function labelText(text, x, y, color) {
+  ctx.save();
+  ctx.font = '600 11px Segoe UI, sans-serif';
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center';
+  ctx.letterSpacing = '0.08em';
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+// init
+selectAxis(0);
+</script>

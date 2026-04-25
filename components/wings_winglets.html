@@ -1,0 +1,189 @@
+<div id="winglet-module">
+  <h3>Wingtip Vortices: The Hidden Enemy</h3>
+  <p class="subtitle">See how winglets reduce induced drag</p>
+
+  <div class="compare">
+    
+    <!-- NO WINGLET -->
+    <div class="panel">
+      <p class="label red">No Winglet</p>
+
+      <svg viewBox="0 0 320 140">
+
+        <defs>
+          <marker id="arrow-red" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
+            <polygon points="0 0, 5 2.5, 0 5" fill="#ff6b6b"/>
+          </marker>
+        </defs>
+
+        <!-- wing -->
+        <polygon points="20,70 240,60 240,75 20,80" class="wing"/>
+
+        <!-- airflow -->
+        <path class="flow fast" d="M20 40 Q150 30 240 60"/>
+        <path class="flow fast" d="M20 100 Q150 110 240 75"/>
+
+        <!-- vortex trail -->
+        <g class="trail strong">
+          <path class="vortex v1" d="M240 65 q 15 -10 25 5 q -10 15 -25 5" marker-end="url(#arrow-red)"/>
+          <path class="vortex v2" d="M240 65 q 15 -10 25 5 q -10 15 -25 5" marker-end="url(#arrow-red)"/>
+          <path class="vortex v3" d="M240 65 q 15 -10 25 5 q -10 15 -25 5" marker-end="url(#arrow-red)"/>
+        </g>
+
+      </svg>
+
+      <p class="desc">Strong vortex → more induced drag</p>
+    </div>
+
+    <!-- WITH WINGLET -->
+    <div class="panel">
+      <p class="label green">With Winglet</p>
+
+      <svg viewBox="0 0 320 140">
+
+        <defs>
+          <marker id="arrow-green" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
+            <polygon points="0 0, 5 2.5, 0 5" fill="#00ff99"/>
+          </marker>
+        </defs>
+
+        <!-- wing -->
+        <polygon points="20,70 240,60 240,75 20,80" class="wing"/>
+
+        <!-- winglet -->
+        <rect x="240" y="40" width="6" height="25" class="winglet"/>
+
+        <!-- airflow -->
+        <path class="flow slow" d="M20 45 Q150 40 240 60"/>
+        <path class="flow slow" d="M20 95 Q150 100 240 75"/>
+
+        <!-- vortex trail -->
+        <g class="trail weak">
+          <path class="vortex v1" d="M240 65 q 10 -6 15 3 q -6 9 -15 3" marker-end="url(#arrow-green)"/>
+          <path class="vortex v2" d="M240 65 q 10 -6 15 3 q -6 9 -15 3" marker-end="url(#arrow-green)"/>
+        </g>
+
+      </svg>
+
+      <p class="desc">Weaker vortex → less drag</p>
+    </div>
+
+  </div>
+</div>
+
+<style>
+#winglet-module {
+  background: #0d1b2a;
+  padding: 20px;
+  border-radius: 12px;
+  font-family: sans-serif;
+  color: #a8c8e0;
+}
+
+h3 {
+  color: #00e5ff;
+  text-align: center;
+  font-size: 16px;
+}
+
+.subtitle {
+  text-align: center;
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+
+.compare {
+  display: flex;
+  gap: 16px;
+}
+
+.panel {
+  flex: 1;
+  background: #112233;
+  padding: 20px;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.label.red { color: #ff6b6b; }
+.label.green { color: #00ff99; }
+
+.desc {
+  font-size: 11px;
+  margin-top: 8px;
+}
+
+/* wing */
+.wing {
+  fill: #2a4a6a;
+  opacity: 0.9;
+}
+
+.winglet {
+  fill: #00e5ff;
+}
+
+/* airflow */
+.flow {
+  fill: none;
+  stroke: #00e5ff;
+  stroke-width: 1.2;
+  stroke-dasharray: 4 4;
+  animation: flowMove linear infinite;
+}
+
+.flow.fast { animation-duration: 1s; }
+.flow.slow { animation-duration: 2s; }
+
+@keyframes flowMove {
+  from { stroke-dashoffset: 0; }
+  to { stroke-dashoffset: -20; }
+}
+
+/* vortex base */
+.vortex {
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+
+  transform-box: fill-box;
+  transform-origin: center;
+
+  animation: vortexLife linear infinite;
+}
+
+/* stagger (generation effect) */
+.v1 { animation-delay: 0s; }
+.v2 { animation-delay: 0.4s; }
+.v3 { animation-delay: 0.8s; }
+
+/* strong vortex */
+.trail.strong .vortex {
+  stroke: #ff6b6b;
+  animation-duration: 1.2s;
+}
+
+/* weak vortex */
+.trail.weak .vortex {
+  stroke: #00ff99;
+  animation-duration: 2.2s;
+}
+
+/* FULL lifecycle: move + rotate + fade */
+@keyframes vortexLife {
+  0% {
+    transform: translate(0px, 0px) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: translate(30px, 4px) rotate(180deg) scale(0.9);
+    opacity: 0.8;
+  }
+
+  100% {
+    transform: translate(70px, 8px) rotate(360deg) scale(0.6);
+    opacity: 0;
+  }
+}
+</style>

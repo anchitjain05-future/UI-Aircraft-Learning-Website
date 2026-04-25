@@ -1,0 +1,525 @@
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  .sim{background:#08131e;padding:1.5rem;font-family:'DM Sans',sans-serif;color:#e0f0f4}
+  .sim-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:600;letter-spacing:.12em;color:#3a6a7a;text-transform:uppercase;margin-bottom:1rem}
+
+  .main-canvas-wrap{position:relative;width:100%;height:260px;margin-bottom:1rem;border-radius:10px;overflow:hidden;background:#050f18}
+  #main-canvas{width:100%;height:100%;display:block}
+
+  .readouts{display:grid;grid-template-columns:repeat(5,1fr);gap:.6rem;margin-bottom:1rem}
+  .rd{background:#0d1e2d;border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:.6rem .8rem}
+  .rd-name{font-size:10px;letter-spacing:.07em;color:#3a6a7a;text-transform:uppercase;margin-bottom:2px}
+  .rd-val{font-family:'DM Mono',monospace;font-size:17px;font-weight:500}
+  .c-fuel{color:#f0a830}
+  .c-oil{color:#40d090}
+  .c-rpm{color:#60b8ff}
+  .c-temp{color:#ff6040}
+  .c-psi{color:#c080ff}
+  .rd-unit{font-size:10px;color:#3a6a7a;margin-left:2px}
+
+  .controls{display:flex;gap:.6rem;margin-bottom:1rem}
+  .ctrl{flex:1;background:#0d1e2d;border:1px solid rgba(255,255,255,0.08);border-radius:8px;padding:.55rem .4rem;font-size:11px;color:#7abccc;cursor:pointer;text-align:center;transition:all .15s;font-family:'DM Sans',sans-serif}
+  .ctrl:hover{border-color:rgba(255,255,255,0.2);color:#c0e8f0}
+  .ctrl.active{background:rgba(0,224,188,0.08);border-color:#00e0bc;color:#00e0bc}
+  .ctrl.fuel-active{background:rgba(240,168,48,0.1);border-color:#f0a830;color:#f0a830}
+  .ctrl.danger{border-color:rgba(255,60,40,0.25);color:#ff8060}
+  .ctrl.danger.active{background:rgba(255,60,40,0.1);border-color:#ff4030;color:#ff5030}
+
+  .log{background:#040d14;border:1px solid rgba(255,255,255,0.05);border-radius:8px;padding:.7rem 1rem;height:62px;overflow:hidden}
+  .log-line{font-family:'DM Mono',monospace;font-size:11px;color:#3a6a7a;line-height:1.7}
+  .log-line.hi{color:#00e0bc}
+  .log-line.fuel{color:#f0a830}
+  .log-line.warn{color:#ffc040}
+  .log-line.alert{color:#ff5030}
+</style>
+
+<div class="sim">
+  <div class="sim-title">Oil &amp; Fuel Systems — Live Engine Simulation</div>
+
+  <div class="main-canvas-wrap">
+    <canvas id="main-canvas"></canvas>
+  </div>
+
+  <div class="readouts">
+    <div class="rd"><div class="rd-name">Fuel Flow</div><div><span class="rd-val c-fuel" id="rd-ff">2,840</span><span class="rd-unit">kg/hr</span></div></div>
+    <div class="rd"><div class="rd-name">Wing Tank</div><div><span class="rd-val c-fuel" id="rd-tank">42,800</span><span class="rd-unit">kg</span></div></div>
+    <div class="rd"><div class="rd-name">Engine RPM</div><div><span class="rd-val c-rpm" id="rd-rpm">98.2</span><span class="rd-unit">%N1</span></div></div>
+    <div class="rd"><div class="rd-name">Oil Temp</div><div><span class="rd-val c-temp" id="rd-ot">148</span><span class="rd-unit">°C</span></div></div>
+    <div class="rd"><div class="rd-name">Oil Pressure</div><div><span class="rd-val c-psi" id="rd-op">62</span><span class="rd-unit">psi</span></div></div>
+  </div>
+
+  <div class="controls">
+    <div class="ctrl active" id="btn-cruise" onclick="setMode('cruise')">✦ Cruise</div>
+    <div class="ctrl" id="btn-takeoff" onclick="setMode('takeoff')">↑ Takeoff thrust</div>
+    <div class="ctrl" id="btn-idle" onclick="setMode('idle')">↓ Idle / descent</div>
+    <div class="ctrl danger" id="btn-oilloss" onclick="setMode('oilloss')">⚠ Oil pressure loss</div>
+    <div class="ctrl danger" id="btn-fuelstv" onclick="setMode('fuelstv')">⚠ Fuel starvation</div>
+  </div>
+
+  <div class="log" id="log">
+    <div class="log-line hi" id="ll0">[ 00:00 ] Both engines nominal. Fuel routing from wing wet bays.</div>
+    <div class="log-line" id="ll1">[ 00:01 ] Oil circuit pressurized. Bearings lubricated at 148°C.</div>
+    <div class="log-line" id="ll2">[ 00:02 ] Fuel flow 2,840 kg/hr. Centre-of-gravity feed sequence active.</div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('main-canvas');
+const ctx = canvas.getContext('2d');
+
+let W, H;
+function resize() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  W = canvas.width = rect.width;
+  H = canvas.height = rect.height;
+}
+resize();
+window.addEventListener('resize', resize);
+
+let tick = 0, logTick = 0;
+let mode = 'cruise';
+
+const MODES = {
+  cruise:  { ff:2840, rpm:98.2, oilT:148, oilP:62,  tank:42800, label:'Cruise power set. Fuel flow nominal.', cls:'hi' },
+  takeoff: { ff:5200, rpm:100,  oilT:171, oilP:68,  tank:42800, label:'TAKEOFF thrust — full fuel flow, oil temp rising.', cls:'fuel' },
+  idle:    { ff:680,  rpm:22,   oilT:112, oilP:44,  tank:42800, label:'Idle / descent. Reduced flow. Oil cooling.', cls:'hi' },
+  oilloss: { ff:2840, rpm:95,   oilT:210, oilP:8,   tank:42800, label:'ALERT: Oil pressure LOW — bearing seizure imminent!', cls:'alert' },
+  fuelstv: { ff:0,    rpm:0,    oilT:60,  oilP:0,   tank:42800, label:'EMERGENCY: Fuel starvation — engine flameout!', cls:'alert' },
+};
+
+let cur = { ff:2840, rpm:98.2, oilT:148, oilP:62, tank:42800 };
+let tgt = { ...MODES.cruise };
+let fuelBurned = 0;
+
+function setMode(m) {
+  mode = m;
+  tgt = { ...MODES[m] };
+  document.querySelectorAll('.ctrl').forEach(b => b.classList.remove('active','fuel-active'));
+  const btn = document.getElementById('btn-'+m);
+  btn.classList.add(m === 'takeoff' ? 'fuel-active' : 'active');
+  addLog(MODES[m].label, MODES[m].cls);
+}
+
+function lerp(a,b,t){ return a+(b-a)*t; }
+
+// ── Particle systems ──────────────────────────────────────
+let fuelParticles = [];   // orange — fuel flow through wings
+let oilParticles  = [];   // green  — oil circuit loop
+let exhaust       = [];   // dark   — exhaust trail
+
+// Wing fuel path (left wing → center → right wing → engine)
+// Engine cross-section bearing orbit for oil
+
+function spawnFuel() {
+  if (mode === 'fuelstv') return;
+  const rate = cur.ff / 5200;
+  if (Math.random() > rate * 0.6) return;
+  // Left wing tank → engine
+  fuelParticles.push({
+    path: 'L',
+    t: 0,
+    speed: 0.004 + rate * 0.006 + Math.random() * 0.003,
+    size: 2 + Math.random(),
+  });
+  if (Math.random() < 0.5) fuelParticles.push({
+    path: 'R', t: 0,
+    speed: 0.004 + rate * 0.006 + Math.random() * 0.003,
+    size: 2 + Math.random(),
+  });
+}
+
+function spawnOil() {
+  if (mode === 'oilloss' || mode === 'fuelstv') return;
+  if (Math.random() > 0.35) return;
+  oilParticles.push({
+    angle: Math.random() * Math.PI * 2,
+    speed: 0.025 + (cur.rpm/100) * 0.04,
+    r: 0,
+    life: 0, maxLife: 120,
+  });
+}
+
+function spawnExhaust() {
+  if (cur.rpm < 5) return;
+  exhaust.push({
+    x: 0, y: 0, // set in draw
+    vx: 2 + Math.random()*2,
+    vy: (Math.random()-0.5)*4,
+    life: 0, maxLife: 35 + Math.random()*20,
+    size: 3 + Math.random()*4,
+    side: Math.random() > 0.5 ? 'L' : 'R',
+  });
+}
+
+// ── Drawing helpers ───────────────────────────────────────
+
+function enginePos(side) {
+  // Returns {x,y} of engine center in canvas coords
+  const ex = side === 'L' ? W * 0.32 : W * 0.68;
+  const ey = H * 0.62;
+  return {x:ex, y:ey};
+}
+
+function wingFuelPath(side) {
+  // Returns array of [x,y] for fuel particle to travel
+  const eng = enginePos(side);
+  const tipX = side === 'L' ? W * 0.05 : W * 0.95;
+  const tipY = H * 0.3;
+  const midX = side === 'L' ? W * 0.18 : W * 0.82;
+  const midY = H * 0.42;
+  return [
+    [tipX, tipY],
+    [midX, midY],
+    [eng.x, eng.y - 18],
+    [eng.x, eng.y],
+  ];
+}
+
+function pathPoint(pts, t) {
+  const segs = pts.length - 1;
+  const seg = Math.min(Math.floor(t * segs), segs - 1);
+  const local = (t * segs) - seg;
+  const a = pts[seg], b = pts[seg+1];
+  return [a[0] + (b[0]-a[0])*local, a[1] + (b[1]-a[1])*local];
+}
+
+function drawBackground() {
+  // Sky
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  grad.addColorStop(0, '#060f1a');
+  grad.addColorStop(1, '#080d16');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Faint grid
+  ctx.strokeStyle = 'rgba(0,80,120,0.07)';
+  ctx.lineWidth = 0.5;
+  for (let x = 0; x < W; x += 40) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for (let y = 0; y < H; y += 40) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+}
+
+function drawWings() {
+  ctx.save();
+  // Wing silhouette
+  ctx.fillStyle = '#0c1e30';
+  ctx.strokeStyle = '#1a3a52';
+  ctx.lineWidth = 1;
+  // Left wing
+  ctx.beginPath();
+  ctx.moveTo(W*0.38, H*0.45);
+  ctx.lineTo(W*0.05, H*0.28);
+  ctx.lineTo(W*0.05, H*0.33);
+  ctx.lineTo(W*0.38, H*0.55);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+  // Right wing
+  ctx.beginPath();
+  ctx.moveTo(W*0.62, H*0.45);
+  ctx.lineTo(W*0.95, H*0.28);
+  ctx.lineTo(W*0.95, H*0.33);
+  ctx.lineTo(W*0.62, H*0.55);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // Wing tank fill level
+  const fillRatio = Math.min(1, cur.tank / 50000);
+  const alpha = 0.08 + fillRatio * 0.1;
+  ctx.fillStyle = `rgba(240,168,48,${alpha})`;
+  ctx.beginPath();
+  ctx.moveTo(W*0.38, H*0.45 + (H*0.1*(1-fillRatio)));
+  ctx.lineTo(W*0.08, H*0.29 + (H*0.06*(1-fillRatio)));
+  ctx.lineTo(W*0.08, H*0.32);
+  ctx.lineTo(W*0.38, H*0.54);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = `rgba(240,168,48,${alpha})`;
+  ctx.beginPath();
+  ctx.moveTo(W*0.62, H*0.45 + (H*0.1*(1-fillRatio)));
+  ctx.lineTo(W*0.92, H*0.29 + (H*0.06*(1-fillRatio)));
+  ctx.lineTo(W*0.92, H*0.32);
+  ctx.lineTo(W*0.62, H*0.54);
+  ctx.closePath();
+  ctx.fill();
+
+  // Wing labels
+  ctx.font = '9px DM Mono, monospace';
+  ctx.fillStyle = 'rgba(240,168,48,0.4)';
+  ctx.fillText('WET BAY', W*0.14, H*0.34);
+  ctx.fillText('WET BAY', W*0.78, H*0.34);
+
+  ctx.restore();
+}
+
+function drawFuelLines() {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(240,168,48,0.1)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4,6]);
+  ['L','R'].forEach(side => {
+    const pts = wingFuelPath(side);
+    ctx.beginPath();
+    pts.forEach(([x,y],i) => i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y));
+    ctx.stroke();
+  });
+  ctx.setLineDash([]);
+  ctx.restore();
+}
+
+function drawEngines() {
+  ['L','R'].forEach(side => {
+    const {x,y} = enginePos(side);
+    const rpm = cur.rpm / 100;
+    const oilOk = mode !== 'oilloss' && mode !== 'fuelstv';
+
+    // Engine nacelle
+    ctx.save();
+    ctx.fillStyle = '#0d1f30';
+    ctx.strokeStyle = '#1e3a52';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(x, y, 38, 22, 0, 0, Math.PI*2);
+    ctx.fill(); ctx.stroke();
+
+    // Fan blades (spinning)
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(tick * 0.06 * rpm);
+    const blades = 8;
+    for (let i=0;i<blades;i++) {
+      const a = (i/blades)*Math.PI*2;
+      ctx.beginPath();
+      ctx.moveTo(0,0);
+      ctx.arc(0, 0, 17, a, a + Math.PI/blades*0.7);
+      ctx.closePath();
+      ctx.fillStyle = `rgba(30,70,100,${0.5+rpm*0.4})`;
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Center hub
+    ctx.beginPath();
+    ctx.arc(x, y, 6, 0, Math.PI*2);
+    ctx.fillStyle = rpm > 0.1 ? `rgba(96,184,255,${0.3+rpm*0.5})` : '#1a2a3a';
+    ctx.fill();
+
+    // Oil circuit ring
+    if (oilOk) {
+      const oilAlpha = (cur.oilP / 70) * 0.5;
+      ctx.beginPath();
+      ctx.arc(x, y, 28, 0, Math.PI*2);
+      ctx.strokeStyle = `rgba(64,208,144,${oilAlpha})`;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3,5]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    } else {
+      // Pulsing red warning
+      const pulse = Math.abs(Math.sin(tick * 0.08));
+      ctx.beginPath();
+      ctx.arc(x, y, 28, 0, Math.PI*2);
+      ctx.strokeStyle = `rgba(255,60,40,${pulse*0.8})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // Exhaust glow
+    if (rpm > 0.1) {
+      const glowGrad = ctx.createRadialGradient(x+38, y, 0, x+38, y, 30*rpm);
+      glowGrad.addColorStop(0, `rgba(255,160,40,${rpm*0.35})`);
+      glowGrad.addColorStop(1, 'rgba(255,100,20,0)');
+      ctx.beginPath();
+      ctx.arc(x+38, y, 30*rpm, 0, Math.PI*2);
+      ctx.fillStyle = glowGrad;
+      ctx.fill();
+    }
+
+    // Label
+    ctx.font = '8px DM Mono, monospace';
+    ctx.fillStyle = 'rgba(96,184,255,0.45)';
+    ctx.textAlign = 'center';
+    ctx.fillText(`ENG ${side}`, x, y+34);
+    ctx.textAlign = 'left';
+    ctx.restore();
+  });
+}
+
+function drawOilParticles() {
+  oilParticles.forEach(p => {
+    const {x,y} = enginePos(p.path || (Math.random()>'0.5'?'L':'R'));
+    // orbit around assigned engine
+  });
+
+  // Redraw as orbit around both engines
+  oilParticles.forEach(p => {
+    const side = p.side || 'L';
+    const eng = enginePos(side);
+    const radius = 24 + Math.sin(p.angle*2)*4;
+    const px = eng.x + Math.cos(p.angle) * radius;
+    const py = eng.y + Math.sin(p.angle) * (radius*0.5);
+    const alpha = (1 - p.life/p.maxLife) * 0.8;
+    ctx.beginPath();
+    ctx.arc(px, py, p.size || 2, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(64,208,144,${alpha})`;
+    ctx.fill();
+    p.angle += p.speed;
+    p.life++;
+  });
+  oilParticles = oilParticles.filter(p => p.life < p.maxLife);
+
+  // Fix: assign side on spawn
+}
+
+function spawnOilFixed() {
+  if (mode === 'oilloss' || mode === 'fuelstv') return;
+  if (Math.random() > 0.4) return;
+  ['L','R'].forEach(side => {
+    if (Math.random() > 0.5) return;
+    oilParticles.push({
+      side,
+      angle: Math.random() * Math.PI * 2,
+      speed: 0.03 + (cur.rpm/100) * 0.05,
+      size: 2,
+      life: 0, maxLife: 80 + Math.random()*40,
+    });
+  });
+}
+
+function drawFuelParticles() {
+  fuelParticles.forEach(p => {
+    const pts = wingFuelPath(p.path);
+    const [px, py] = pathPoint(pts, p.t);
+    const alpha = p.t < 0.1 ? p.t/0.1 : p.t > 0.85 ? (1-p.t)/0.15 : 1;
+    ctx.beginPath();
+    ctx.arc(px, py, p.size, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(240,168,48,${alpha * 0.85})`;
+    ctx.fill();
+    p.t += p.speed;
+  });
+  fuelParticles = fuelParticles.filter(p => p.t < 1);
+}
+
+function drawExhaust() {
+  exhaust.forEach(p => {
+    const eng = enginePos(p.side);
+    const prog = p.life / p.maxLife;
+    const px = eng.x + 38 + p.vx * p.life;
+    const py = eng.y + p.vy * p.life;
+    const alpha = (1-prog) * 0.25;
+    ctx.beginPath();
+    ctx.arc(px, py, p.size*(1+prog), 0, Math.PI*2);
+    ctx.fillStyle = `rgba(255,140,30,${alpha})`;
+    ctx.fill();
+    p.life++;
+  });
+  exhaust = exhaust.filter(p => p.life < p.maxLife);
+}
+
+function drawLabels() {
+  ctx.font = '9px DM Mono, monospace';
+
+  // Fuel temp label
+  if (mode !== 'fuelstv') {
+    ctx.fillStyle = 'rgba(240,168,48,0.35)';
+    ctx.fillText('JET-A  –47°C flash point', W*0.06, H*0.22);
+  }
+
+  // Oil temp indicator near engines
+  ['L','R'].forEach(side => {
+    const {x,y} = enginePos(side);
+    const danger = mode === 'oilloss';
+    ctx.fillStyle = danger ? `rgba(255,60,40,${0.5+Math.abs(Math.sin(tick*0.08))*0.5})` : 'rgba(64,208,144,0.5)';
+    ctx.textAlign = 'center';
+    ctx.fillText(danger ? '⚠ OIL LOW' : `OIL ${Math.round(cur.oilT)}°C`, x, y - 30);
+    ctx.textAlign = 'left';
+  });
+
+  // RPM arc text
+  ctx.fillStyle = 'rgba(96,184,255,0.4)';
+  ctx.textAlign = 'center';
+  ctx.font = '10px DM Mono, monospace';
+  ctx.fillText(`N1 ${cur.rpm.toFixed(1)}%`, W*0.5, H*0.15);
+  ctx.textAlign = 'left';
+}
+
+function drawFuelStarvation() {
+  if (mode !== 'fuelstv') return;
+  const pulse = Math.abs(Math.sin(tick*0.06));
+  ['L','R'].forEach(side => {
+    const {x,y} = enginePos(side);
+    ctx.beginPath();
+    ctx.arc(x, y, 32+pulse*8, 0, Math.PI*2);
+    ctx.strokeStyle = `rgba(255,60,40,${pulse*0.6})`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  });
+}
+
+function updateCurrent() {
+  const spd = 0.025;
+  cur.ff   = lerp(cur.ff,   tgt.ff,   spd);
+  cur.rpm  = lerp(cur.rpm,  tgt.rpm,  spd);
+  cur.oilT = lerp(cur.oilT, tgt.oilT, spd);
+  cur.oilP = lerp(cur.oilP, tgt.oilP, spd);
+
+  // Fuel burn
+  if (mode !== 'fuelstv') {
+    fuelBurned += cur.ff / (3600 * 60);
+    cur.tank = Math.max(0, 42800 - fuelBurned);
+  }
+
+  // Readouts
+  document.getElementById('rd-ff').textContent   = Math.round(cur.ff).toLocaleString();
+  document.getElementById('rd-tank').textContent  = Math.round(cur.tank).toLocaleString();
+  document.getElementById('rd-rpm').textContent   = cur.rpm.toFixed(1);
+  document.getElementById('rd-ot').textContent    = Math.round(cur.oilT);
+  document.getElementById('rd-op').textContent    = Math.round(cur.oilP);
+}
+
+let autoLogTick = 0;
+function addLog(msg, cls) {
+  const m = String(Math.floor(tick/60)).padStart(2,'0');
+  const s = String(tick%60).padStart(2,'0');
+  const lines = document.querySelectorAll('.log-line');
+  lines[0].textContent = lines[1].textContent; lines[0].className='log-line';
+  lines[1].textContent = lines[2].textContent; lines[1].className='log-line';
+  lines[2].textContent = `[ ${m}:${s} ] ${msg}`;
+  lines[2].className = `log-line ${cls}`;
+}
+function autoLog() {
+  autoLogTick++;
+  if (autoLogTick % 130 !== 0) return;
+  const msgs = {
+    cruise:  [['Fuel feed from wing wet bays. CG sequence nominal.','fuel'],['Oil circuit pressure 62 psi. All bearings lubricated.','hi'],['Fuel flow 2,840 kg/hr. Both engines balanced.','hi']],
+    takeoff: [['Full thrust — fuel flow 5,200 kg/hr. Oil temp rising.','fuel'],['PACK bleed reduced for max engine pressure ratio.','fuel']],
+    idle:    [['Idle descent. Fuel flow 680 kg/hr. Oil cooling.','hi']],
+    oilloss: [['ALERT: Oil pressure dropping — bearing temp critical!','alert'],['WARN: Engine seizure risk. Shutdown checklist initiated.','warn']],
+    fuelstv: [['EMERGENCY: Fuel starvation. Engine flameout both sides.','alert'],['MAYDAY: Attempting relight. Glide established.','alert']],
+  };
+  const arr = msgs[mode] || msgs.cruise;
+  const [msg,cls] = arr[Math.floor(Math.random()*arr.length)];
+  addLog(msg, cls);
+}
+
+function loop() {
+  tick++;
+  updateCurrent();
+  drawBackground();
+  drawWings();
+  drawFuelLines();
+  drawFuelParticles();
+  drawEngines();
+  spawnOilFixed();
+  drawOilParticles();
+  drawExhaust();
+  drawLabels();
+  drawFuelStarvation();
+  spawnFuel();
+  if (tick % 4 === 0) spawnExhaust();
+  autoLog();
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
